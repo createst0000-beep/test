@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>食事記録</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2a78d6">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<style>
+:root{color-scheme:light;--bg:#f6f5f2;--surface:#fcfcfb;--line:#e4e2dc;--ink:#0b0b0b;--ink2:#52514e;--muted:#7a7974;--accent:#2a78d6;--accentInk:#fff;--bar:#1baf7a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#121211;--surface:#1a1a19;--line:#33332f;--ink:#f0efec;--ink2:#c3c2b7;--muted:#96958d;--accent:#3987e5;--bar:#199e70}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#121211;--surface:#1a1a19;--line:#33332f;--ink:#f0efec;--ink2:#c3c2b7;--muted:#96958d;--accent:#3987e5;--bar:#199e70}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:560px;margin:0 auto;padding:16px 16px 80px}
+h1{font-size:1.3rem;margin:4px 0 12px}h2{font-size:1rem;margin:0 0 10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.big{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:18px;border-radius:12px;border:0;background:var(--accent);color:var(--accentInk);font-size:1.1rem;font-weight:600}
+button,select,input,textarea{font:inherit;color:inherit}
+select,input[type=text],input[type=number],textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
+.chips label{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.9rem}
+.chips input{margin-right:4px}
+.muted{color:var(--muted)}.small{font-size:.85rem}
+.meter{height:10px;background:var(--line);border-radius:6px;overflow:hidden}.meter span{display:block;height:100%;background:var(--bar);border-radius:0 6px 6px 0}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat b{display:block;font-size:1.3rem;font-variant-numeric:tabular-nums}
+.meal{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:start;border-top:1px solid var(--line);padding:10px 0}
+.meal img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:var(--line)}
+#preview{max-width:100%;border-radius:10px;display:none;margin-top:10px}
+#result{white-space:pre-wrap}
+a{color:var(--accent)} a.btn{text-decoration:none}
+</style></head><body><main>
+<h1>📸 食事・飲み物を記録</h1>
+
+<form class="card" id="mealForm">
+  <div class="row" style="margin-bottom:10px">
+    <select name="slot" style="flex:1">{% for s in slots %}<option {% if s==slot %}selected{% endif %}>{{s}}</option>{% endfor %}</select>
+  </div>
+  <label class="big" for="photo">写真を撮る／選ぶ</label>
+  <input id="photo" name="photo" type="file" accept="image/*" capture="environment" hidden>
+  <img id="preview" alt="">
+  <input type="text" name="note" placeholder="メモ（例: ご飯大盛り・ビール350ml）" style="margin-top:10px">
+  <button class="big" style="margin-top:10px" id="send" type="submit">登録してカロリー推定</button>
+  <p id="result" class="small muted"></p>
+</form>
+
+<section class="card">
+  <h2>今日</h2>
+  <div class="stat">
+    <div><span class="small muted">摂取</span><b>{{ '{:,.0f}'.format(intake) }} kcal</b></div>
+    <div><span class="small muted">消費（Fit・リング）</span><b>{{ '{:,.0f}'.format(health.total_burn_kcal) if health.total_burn_kcal else '—' }}{% if health.total_burn_kcal %} kcal{% endif %}</b></div>
+  </div>
+  <p class="small" style="margin:10px 0 4px">たんぱく質 {{ '%.0f'|format(protein) }} / {{protein_target}} g（2.0 g/kg）</p>
+  <div class="meter"><span style="width:{{ [100, (protein / protein_target * 100)]|min }}%"></span></div>
+  {% for m in meals %}
+  <div class="meal">
+    {% if m.photo %}<img src="/photos/{{m.photo}}" alt="">{% else %}<div></div>{% endif %}
+    <div><b>{{m.slot}}</b> <span class="muted small">{{m.eaten_at[11:16]}}</span><br>
+      <span class="small">{% for it in m['items'] %}{{it.name}}{% if not loop.last %}・{% endif %}{% endfor %}</span></div>
+    <div class="small" style="text-align:right">{{ '%.0f'|format(m.kcal) }} kcal<br>P {{ '%.0f'|format(m.protein_g) }} g<br>
+      <button class="btn small" data-del="{{m.id}}">削除</button></div>
+  </div>
+  {% endfor %}
+</section>
+
+<form class="card" id="woForm">
+  <h2>💪 筋トレを記録（部位・セット数）</h2>
+  <p class="small muted" style="margin-top:-4px">リングやFitでは部位とセット数が取れないので、ここで補います。</p>
+  <div class="row chips" style="margin-bottom:8px">
+    {% for k,v in [('chest','胸'),('back','背中'),('legs','脚'),('shoulders','肩'),('arms','腕'),('core','体幹'),('glutes','お尻')] %}
+    <label><input type="checkbox" name="mg" value="{{k}}">{{v}}</label>{% endfor %}
+  </div>
+  <div class="row"><input type="text" name="name" placeholder="内容（例: ベンチ・ラットプル）" style="flex:2">
+    <input type="number" name="sets" placeholder="セット" style="flex:1"><input type="number" name="minutes" placeholder="分" style="flex:1"></div>
+  <button class="btn" style="margin-top:10px;width:100%">筋トレを登録</button>
+</form>
+
+<form class="card" id="hForm">
+  <h2>⌚ 今日の消費・体のデータ（自動連携できない日の手入力）</h2>
+  <p class="small muted" style="margin-top:-4px">SOXAI アプリ／Fit の画面に出ている数値を入れてください。自動連携の値があれば上書きされます。</p>
+  <div class="row"><input type="number" name="total_burn_kcal" placeholder="総消費 kcal" style="flex:1"><input type="number" name="steps" placeholder="歩数" style="flex:1"></div>
+  <div class="row" style="margin-top:8px"><input type="number" step="0.1" name="sleep_hours" placeholder="睡眠 時間" style="flex:1"><input type="number" step="0.1" name="weight_kg" placeholder="体重 kg" style="flex:1"></div>
+  <button class="btn" style="margin-top:10px;width:100%">保存</button>
+</form>
+
+<section class="card">
+  <h2>🔔 リマインド（7・12・19・21時）</h2>
+  <div class="row">
+    <button class="btn" id="pushBtn">プッシュ通知をオン</button>
+    <button class="btn" id="pushTest">テスト通知</button>
+    <a class="btn" href="/reminders.ics">カレンダーに追加（.ics）</a>
+  </div>
+  <p class="small muted" id="pushMsg">音とバイブは端末の通知設定に従います。スマホの時計アプリのアラームも併用してください（手順は docs/phone_setup.md）。</p>
+</section>
+
+<section class="card row">
+  <a class="btn" href="/report">📊 週間レポートを見る</a>
+  {% if token %}<button class="btn" id="tokenBtn">アクセストークン設定</button>{% endif %}
+</section>
+</main>
+<script>
+const tok = () => localStorage.getItem('token') || '';
+const hdr = () => tok() ? { Authorization: 'Bearer ' + tok() } : {};
+const tb = document.getElementById('tokenBtn');
+if (tb) tb.onclick = () => { const t = prompt('INGEST_TOKEN', tok()); if (t !== null) localStorage.setItem('token', t); };
+
+const photo = document.getElementById('photo'), preview = document.getElementById('preview');
+photo.onchange = () => { const f = photo.files[0]; if (f) { preview.src = URL.createObjectURL(f); preview.style.display = 'block'; } };
+
+document.getElementById('mealForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const r = document.getElementById('result'), b = document.getElementById('send');
+  b.disabled = true; r.textContent = '解析中…（10〜20秒）';
+  try {
+    const res = await fetch('/api/meals', { method: 'POST', body: new FormData(e.target), headers: hdr() });
+    if (!res.ok) throw new Error(res.status + ' ' + await res.text());
+    const d = await res.json();
+    const lines = d.items.map(i => `${i.name} ${i.amount || ''}  ${Math.round(i.kcal)}kcal  P${Math.round(i.protein_g)}g`);
+    const tot = d.items.reduce((a, i) => a + i.kcal, 0);
+    r.textContent = (lines.join('\n') || '品目なし') + `\n合計 ${Math.round(tot)} kcal（確度: ${d.confidence}）\n${d.comment || ''}`;
+    setTimeout(() => location.reload(), 2500);
+  } catch (err) { r.textContent = '失敗: ' + err.message; }
+  b.disabled = false;
+};
+
+document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+  if (!confirm('この記録を削除しますか？')) return;
+  await fetch('/api/meals/' + b.dataset.del, { method: 'DELETE', headers: hdr() }); location.reload();
+});
+
+document.getElementById('woForm').onsubmit = async (e) => {
+  e.preventDefault(); const f = new FormData(e.target);
+  const body = { type: 'strength', name: f.get('name'), sets: +f.get('sets') || null, minutes: +f.get('minutes') || null, muscle_groups: f.getAll('mg') };
+  const res = await fetch('/api/workouts', { method: 'POST', headers: { 'Content-Type': 'application/json', ...hdr() }, body: JSON.stringify(body) });
+  alert(res.ok ? '登録しました' : '失敗しました'); if (res.ok) e.target.reset();
+};
+
+document.getElementById('hForm').onsubmit = async (e) => {
+  e.preventDefault(); const f = new FormData(e.target); const body = { date: new Date().toLocaleDateString('sv-SE'), source: 'manual' };
+  for (const [k, v] of f.entries()) if (v !== '') body[k] = +v;
+  const res = await fetch('/api/health', { method: 'POST', headers: { 'Content-Type': 'application/json', ...hdr() }, body: JSON.stringify(body) });
+  alert(res.ok ? '保存しました' : '失敗しました'); if (res.ok) location.reload();
+};
+
+const msg = document.getElementById('pushMsg');
+function b64ToU8(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); const p = '='.repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s + p), c => c.charCodeAt(0)); }
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+document.getElementById('pushBtn').onclick = async () => {
+  try {
+    if (!('PushManager' in window)) throw new Error('このブラウザは非対応です（iPhoneはホーム画面に追加してから開いてください）');
+    if (await Notification.requestPermission() !== 'granted') throw new Error('通知が許可されませんでした');
+    const reg = await navigator.serviceWorker.ready;
+    const { publicKey } = await (await fetch('/api/push/key')).json();
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(publicKey) });
+    await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', ...hdr() }, body: JSON.stringify(sub) });
+    msg.textContent = '通知をオンにしました。7・12・19・21時に撮影リマインド、22時にレポート通知が届きます。';
+  } catch (err) { msg.textContent = err.message; }
+};
+document.getElementById('pushTest').onclick = async () => {
+  const d = await (await fetch('/api/push/test', { method: 'POST', headers: hdr() })).json(); msg.textContent = `${d.sent}台に送信しました`;
+};
+</script></body></html>

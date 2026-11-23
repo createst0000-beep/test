@@ -1,0 +1,9 @@
+{
+  "name": "食事写真カロリー記録",
+  "short_name": "食事記録",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f5f2",
+  "theme_color": "#2a78d6",
+  "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
