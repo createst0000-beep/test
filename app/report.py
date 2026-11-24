@@ -61,7 +61,7 @@ def _col_path(x, y0, w, h, r=4):
 def chart_intake_burn(daily):
     """摂取 vs 消費（グループ縦棒）。"""
     W, H, L, R, T, B = 640, 260, 48, 12, 16, 34
-    vmax, ticks = _ticks(max([d["intake"] for d in daily] + [d["burn"] or 0 for d in daily] + [1]))
+    vmax, ticks = _ticks(max([d["intake"] for d in daily] + [d["burn"] or 0 for d in daily] + [1000]))
     pw, ph = W - L - R, H - T - B
     band = pw / len(daily)
     bw = min(20, band / 3)
@@ -216,7 +216,7 @@ def render(data):
     muscle_rows = [{"name": g, "count": c, "sets": ex["muscle_sets"].get(g, 0)} for g, c in sorted(ex["muscle_hits"].items(), key=lambda x: -x[1])]
 
     table_rows = "".join(
-        f'<tr><td>{d["date"][5:]}（{d["weekday"]}）</td><td class="num">{_fmt(d["intake"])}</td><td class="num">{_fmt(d["burn"])}</td>'
+        f'<tr><td>{d["date"][5:]}（{d["weekday"]}）{"<br><span class=muted>集計中</span>" if d.get("partial") else ""}</td><td class="num">{_fmt(d["intake"])}</td><td class="num">{_fmt(d["burn"])}</td>'
         f'<td class="num">{_fmt(d["net"])}</td><td class="num">{d["protein"]:.0f}</td><td class="num">{_fmt(d["steps"])}</td>'
         f'<td class="num">{_fmt((d["sleep_min"] or 0) / 60 if d["sleep_min"] else None, 1)}</td><td class="num">{_fmt(d["weight"], 1)}</td></tr>'
         for d in daily)

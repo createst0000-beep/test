@@ -81,8 +81,14 @@ def analyze_week(end: date | None = None, con=None):
             "workouts": wo_by_day.get(k, []),
         })
 
-    logged = [x for x in daily if x["meal_count"] > 0]
-    with_net = [x for x in daily if x["net"] is not None]
+    # 今日がまだ終わっていない（21時前）なら、平均からは除く（途中の値で平均が下がるのを防ぐ）
+    now = datetime.now(config.TZ)
+    for x in daily:
+        x["partial"] = x["date"] == now.date().isoformat() and now.hour < 21
+    logged = [x for x in daily if x["meal_count"] > 0 and not x["partial"]]
+    # 品目の内訳が無い日（塩分・食物繊維が0）は、塩分・食物繊維の平均から除く
+    detailed = [x for x in logged if x["salt"] > 0 or x["fiber"] > 0]
+    with_net = [x for x in daily if x["net"] is not None and not x["partial"]]
 
     def avg(vals):
         vals = [v for v in vals if v is not None]
@@ -95,8 +101,8 @@ def analyze_week(end: date | None = None, con=None):
         "avg_burn": avg([x["burn"] for x in daily]),
         "avg_net": avg([x["net"] for x in with_net]),
         "avg_protein": avg([x["protein"] for x in logged]),
-        "avg_salt": avg([x["salt"] for x in logged]),
-        "avg_fiber": avg([x["fiber"] for x in logged]),
+        "avg_salt": avg([x["salt"] for x in detailed]),
+        "avg_fiber": avg([x["fiber"] for x in detailed]),
         "alcohol_total": sum(x["alcohol"] for x in daily),
         "avg_steps": avg([x["steps"] for x in daily]),
         "avg_sleep_h": (avg([x["sleep_min"] for x in daily]) or 0) / 60 or None,
@@ -190,8 +196,9 @@ def food_notes(s, daily):
                                f"平均収支は{net:+.0f}kcal/日（推定{-proj:.1f}kg/月）。1日約500kcalを超える不足は筋トレによる除脂肪量の維持・増加を妨げやすく、週1%を超える減量は筋力低下を招きやすいです。炭水化物を中心に200〜300kcal戻してください。",
                                ["murphy2022", "helms2014", "garthe2011"]))
         else:
-            notes.append(_note(GOOD, "カロリー収支は目標範囲",
-                               f"平均収支は{net:+.0f}kcal/日（推定{-proj:.1f}kg/月）。目標の{tlo}〜{thi}kcal/日に収まっています。ただし約500kcalを超える不足は筋量維持に不利になり得るため、下限側（−500前後）に寄せるのが筋トレ中は安全です。",
+            inside = tlo <= net <= thi
+            notes.append(_note(GOOD if inside else INFO, "カロリー収支は目標範囲" if inside else "カロリー収支は目標にほぼ届いている",
+                               f"平均収支は{net:+.0f}kcal/日（推定{-proj:.1f}kg/月）。目標は{tlo}〜{thi}kcal/日{'で、範囲に収まっています' if inside else f'で、あと約{net - thi:.0f}kcal足りません'}。ただし約500kcalを超える不足は筋量維持に不利になり得るため、下限側（−500前後）に寄せるのが筋トレ中は安全です。",
                                ["hall2008", "murphy2022"]))
         notes.append(_note(INFO, "消費カロリーは誤差を見込む",
                            "スマホやリングの消費カロリーは20%以上ずれることがあります。収支だけでなく、体重の週平均の推移（月2〜3kg減＝週0.5〜0.75kg）で答え合わせをしてください。",
