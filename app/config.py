@@ -24,7 +24,7 @@ BODY_WEIGHT_KG = float(os.environ.get("BODY_WEIGHT_KG", "70"))
 SEX = os.environ.get("SEX", "male")  # male / female
 
 # リマインド時刻
-REMINDER_TIMES = [(7, 0, "朝食"), (12, 0, "昼食"), (19, 0, "夕食"), (21, 0, "間食・飲み物")]
+REMINDER_TIMES = [(8, 0, "朝食"), (12, 0, "昼食"), (19, 0, "夕食"), (21, 0, "間食・飲み物")]
 REPORT_TIME = (22, 0)
 
 # 健康データ取り込み API の簡易トークン（スマホ自動化アプリから送るとき用）

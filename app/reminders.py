@@ -1,6 +1,6 @@
 """リマインダー: カレンダー（.ics）と Web Push 通知。
 
-.ics は毎日 7:00 / 12:00 / 19:00 / 21:00 の繰り返し予定に、音つきアラーム（AUDIO）と画面通知（DISPLAY）を
+.ics は毎日 8:00 / 12:00 / 19:00 / 21:00 の繰り返し予定に、音つきアラーム（AUDIO）と画面通知（DISPLAY）を
 付けたもの。Google カレンダー／iPhone カレンダーに読み込むと端末の通知音・バイブで鳴る。
 """
 import json
@@ -17,10 +17,12 @@ def build_ics(app_url: str = "") -> str:
     tz = str(config.TZ)
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//meal-tracker//JP", "CALSCALE:GREGORIAN",
              "X-WR-CALNAME:食事写真リマインド", f"X-WR-TIMEZONE:{tz}"]
-    times = [(h, m, f"{label}の写真を送る") for h, m, label in config.REMINDER_TIMES]
-    times.append((*config.REPORT_TIME, "週間レポートを確認"))
-    for h, m, title in times:
-        uid = f"meal-reminder-{h:02d}{m:02d}@meal-tracker"
+    slots = ["breakfast", "lunch", "dinner", "snack"]
+    times = [(h, m, f"{label}の写真を送る", slots[i]) for i, (h, m, label) in enumerate(config.REMINDER_TIMES)]
+    times.append((*config.REPORT_TIME, "週間レポートを確認", "report"))
+    for h, m, title, key in times:
+        # 時刻を変えても同じ予定として更新されるよう、UID は時刻ではなく区分で決める
+        uid = f"meal-reminder-{key}@meal-tracker"
         desc = f"アプリを開いて撮影: {app_url}" if app_url else "食事・飲み物の写真を撮って登録"
         lines += [
             "BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{today}T000000Z",
