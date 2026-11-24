@@ -288,7 +288,7 @@ details.day{{border-bottom:1px solid var(--line);padding:8px 0}} details.day sum
 #tip b{{display:block}} .hit:hover path,.hit:hover .hb{{opacity:.8}}
 </style></head><body><main>
 <h1>週間カロリーレポート</h1>
-<p style="margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)">これは毎日22時時点の保存版です。<b>常に最新のレポート</b>は記録ページの「週間レポート」タブで見られます：<a href="https://claude.ai/artifact/3HUAV7ay7hQkh7jh9RpXBk#report" target="_blank" rel="noopener">最新のレポートを開く</a></p>
+<p style="margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)">このページは記録の更新に合わせて作り直しています（毎日22時にも自動更新）。記録した直後の数字は、記録ページの「週間レポート」タブでリアルタイムに見られます：<a href="https://claude.ai/artifact/3HUAV7ay7hQkh7jh9RpXBk#report" target="_blank" rel="noopener">最新のレポートを開く</a></p>
 <p class="sub">{start} 〜 {end}　{weight_line}　<span class="muted">生成 {generated}</span></p>
 <div class="tiles">{tiles}</div>
 
