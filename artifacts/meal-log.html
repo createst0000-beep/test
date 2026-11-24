@@ -1,0 +1,771 @@
+<title>食事写真ログ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one narrow column of task cards, the day's balance on top, inputs below */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --line:#dfe4ea; --ink:#101418; --ink2:#4a5561; --muted:#7a8591;
+  --accent:#2a78d6; --accent-ink:#ffffff; --accent-soft:#e6f0fb;
+  --good:#0a7d0a; --warn:#b26b00; --bad:#c23434; --meter:#1baf7a;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --neg:#2a78d6; --pos:#e34948; --band:rgba(42,120,214,.10); --grid:#e9edf1;
+  --font:"Hiragino Sans","Noto Sans JP",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#101316; --surface:#181c20; --line:#2c333a; --ink:#eef1f4; --ink2:#bac3cc; --muted:#8a949e;
+  --accent:#3987e5; --accent-ink:#ffffff; --accent-soft:#1b2a3b; --good:#3cbf3c; --warn:#e0a234; --bad:#e66767; --meter:#199e70; --s1:#3987e5; --s2:#d95926; --s3:#199e70; --neg:#3987e5; --pos:#e66767; --band:rgba(57,135,229,.14); --grid:#262c32; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101316; --surface:#181c20; --line:#2c333a; --ink:#eef1f4; --ink2:#bac3cc; --muted:#8a949e;
+  --accent:#3987e5; --accent-ink:#ffffff; --accent-soft:#1b2a3b; --good:#3cbf3c; --warn:#e0a234; --bad:#e66767; --meter:#199e70; --s1:#3987e5; --s2:#d95926; --s3:#199e70; --neg:#3987e5; --pos:#e66767; --band:rgba(57,135,229,.14); --grid:#262c32; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 64px}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:1.25rem;margin:0;text-wrap:balance}
+h2{font-size:1rem;margin:0 0 10px;text-wrap:balance}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.muted{color:var(--muted)} .small{font-size:.84rem} .ink2{color:var(--ink2)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row > *{min-width:0}
+input,select,textarea,button{font:inherit;color:inherit}
+input[type=text],input[type=number],input[type=date],select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 12px;cursor:pointer}
+.btn:focus-visible,.primary:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary{display:flex;align-items:center;justify-content:center;width:100%;padding:16px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:1.05rem;cursor:pointer}
+.primary[disabled],.btn[disabled]{opacity:.55;cursor:default}
+.ghost{background:var(--accent-soft);color:var(--ink);border:0}
+.balance{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.balance div{min-width:0}
+.balance b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.net-neg{color:var(--good)} .net-pos{color:var(--bad)}
+.meter{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+.meter span{display:block;height:100%;background:var(--meter);border-radius:0 6px 6px 0}
+.status{font-size:.86rem;color:var(--ink2);min-height:1.4em;white-space:pre-wrap}
+.status.err{color:var(--bad)}
+.list{display:flex;flex-direction:column}
+.entry{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:start;border-top:1px solid var(--line);padding:10px 0}
+.entry:first-child{border-top:0}
+.entry img,.entry .ph{width:56px;height:56px;border-radius:8px;object-fit:cover;background:var(--line)}
+.entry .r{text-align:right;font-variant-numeric:tabular-nums;font-size:.86rem;white-space:nowrap}
+.entry .name{font-size:.88rem;overflow-wrap:anywhere}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips label{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.88rem;cursor:pointer}
+.chips input{margin-right:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid2 label,.field{display:flex;flex-direction:column;gap:2px;font-size:.8rem;color:var(--ink2);min-width:0}
+.confirm{display:flex;flex-direction:column;gap:10px;border:1px dashed var(--line);border-radius:10px;padding:10px;margin-top:10px}
+.wo{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-size:.88rem;border-top:1px solid var(--line);padding-top:6px}
+.deadline{font-size:.8rem;border-radius:999px;padding:2px 10px;background:var(--accent-soft);color:var(--ink)}
+.deadline.late{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+a{color:var(--accent)}
+.empty{padding:8px 0;color:var(--muted);font-size:.88rem}
+details summary{cursor:pointer;color:var(--ink2);font-size:.88rem}
+.stack{display:flex;flex-direction:column;gap:14px}
+.tabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tabs button{flex:1;border:0;background:transparent;border-radius:9px;padding:9px;cursor:pointer;color:var(--ink2);font-weight:600}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.tile .tl{font-size:.78rem;color:var(--ink2)} .tile .tv{font-size:1.2rem;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap} .tile .ts{font-size:.72rem;color:var(--muted)}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart .grid{stroke:var(--grid);stroke-width:1} .chart .axis{stroke:var(--ink2);stroke-width:1} .chart .ref{stroke:var(--ink2);stroke-width:1;opacity:.55}
+.chart .band{fill:var(--band)} .chart .tick{fill:var(--muted);font-size:13px} .chart .val{fill:var(--ink2);font-size:13px;font-variant-numeric:tabular-nums}
+@media (max-width:520px){.chart .tick,.chart .val{font-size:19px}}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--ink2);margin-bottom:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.hbars{display:flex;flex-direction:column;gap:6px}
+.hrow{display:grid;grid-template-columns:minmax(70px,40%) 1fr auto;gap:8px;align-items:center;font-size:.86rem}
+.hl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .ht{height:12px} .hb{display:block;height:12px;border-radius:0 4px 4px 0;min-width:2px}
+.hv{color:var(--ink2);font-variant-numeric:tabular-nums;font-size:.8rem}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.84rem} th,td{padding:6px 5px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--ink2);font-weight:500} .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.note{border:1px solid var(--line);border-left:4px solid var(--ink2);border-radius:8px;padding:9px 11px}
+.note.good{border-left-color:var(--good)} .note.warn{border-left-color:var(--warn)} .note.alert{border-left-color:var(--bad)}
+.note header{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .note h4{margin:0;font-size:.92rem} .note p{margin:6px 0;font-size:.9rem}
+.badge{font-size:.7rem;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink2);white-space:nowrap} .badge b{margin-right:4px}
+.note.good .badge b{color:var(--good)} .note.alert .badge b{color:var(--bad)} .note.warn .badge b{color:var(--warn)}
+.note ul{padding-left:18px;margin:6px 0;font-size:.78rem} .note a{color:var(--ink2)}
+.notes{display:flex;flex-direction:column;gap:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px} .two>*{min-width:0} @media (max-width:560px){.two{grid-template-columns:1fr}}
+h3{font-size:.88rem;margin:12px 0 6px;color:var(--ink2)}
+details.dayd{border-top:1px solid var(--line);padding:7px 0} details.dayd summary{display:flex;justify-content:space-between;gap:8px}
+#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.14);z-index:9;white-space:nowrap}
+#tip b{display:block}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<main>
+  <div class="top">
+    <h1>食事写真ログ</h1>
+    <input type="date" id="day" style="width:auto">
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabLog" aria-selected="true">記録</button>
+    <button role="tab" id="tabReport" aria-selected="false">週間レポート</button>
+  </div>
+  <div id="viewLog" class="stack">
+
+  <section class="card" aria-labelledby="hBal">
+    <div class="top" style="margin-bottom:8px"><h2 id="hBal" style="margin:0">この日の収支</h2><span class="deadline" id="deadline">21時までに送信 → 22時のレポートに反映</span></div>
+    <div class="balance">
+      <div><span class="small muted">摂取</span><b id="bIn">—</b></div>
+      <div><span class="small muted">消費</span><b id="bOut">—</b></div>
+      <div><span class="small muted">収支</span><b id="bNet">—</b></div>
+    </div>
+    <p class="small ink2" style="margin:10px 0 4px">たんぱく質 <span id="pNow">0</span> / <span id="pGoal">—</span> g（体重×2.0 g）</p>
+    <div class="meter"><span id="pBar" style="width:0%"></span></div>
+    <p class="small muted" style="margin:8px 0 0" id="netHint">目標の収支は −513〜−770 kcal/日（月2〜3kg減）。筋トレ中は −500 前後が安全です。</p>
+  </section>
+
+  <section class="card" aria-labelledby="hMeal">
+    <h2 id="hMeal">食事・飲み物の写真</h2>
+    <div class="row" style="margin-bottom:10px">
+      <select id="slot" style="flex:1"><option>朝食</option><option>昼食</option><option>夕食</option><option>間食・飲み物</option></select>
+    </div>
+    <label class="primary" for="mealFile" id="mealPick">写真を撮る／選ぶ</label>
+    <input type="file" id="mealFile" accept="image/*" capture="environment" hidden>
+    <input type="text" id="mealNote" placeholder="メモ（例: ご飯大盛り・ビール350ml）" style="margin-top:10px">
+    <p class="status" id="mealStatus" aria-live="polite"></p>
+    <div class="list" id="meals"><p class="empty">この日の食事はまだありません。写真を撮ると品目・カロリー・たんぱく質を推定して保存します。</p></div>
+  </section>
+
+  <section class="card" aria-labelledby="hShot">
+    <h2 id="hShot">消費カロリー・睡眠のスクショ</h2>
+    <p class="small muted" style="margin:-4px 0 10px">Fit・ヘルスコネクト・SOXAI アプリの画面を撮って送ってください。数枚まとめて選べます。読み取った値は保存前に確認できます。</p>
+    <label class="btn ghost" for="shotFile" style="display:block;text-align:center;padding:12px">スクショを選ぶ</label>
+    <input type="file" id="shotFile" accept="image/*" multiple hidden>
+    <p class="status" id="shotStatus" aria-live="polite"></p>
+    <div id="shotConfirm" class="confirm" hidden>
+      <div class="grid2">
+        <label>総消費 kcal（基礎代謝込み）<input type="number" id="f_total_burn_kcal"></label>
+        <label>活動消費 kcal<input type="number" id="f_active_kcal"></label>
+        <label>歩数<input type="number" id="f_steps"></label>
+        <label>睡眠（分）<input type="number" id="f_sleep_min"></label>
+        <label>体重 kg<input type="number" step="0.1" id="f_weight_kg"></label>
+        <label>体脂肪 %<input type="number" step="0.1" id="f_body_fat_pct"></label>
+      </div>
+      <div id="shotWorkouts"></div>
+      <p class="small muted" id="shotNote"></p>
+      <div class="row"><button class="primary" id="shotSave" style="flex:1">この内容で保存</button><button class="btn" id="shotCancel">やめる</button></div>
+    </div>
+    <div id="healthNow" class="small ink2" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card" aria-labelledby="hWo">
+    <h2 id="hWo">筋トレ（部位・セット数）</h2>
+    <p class="small muted" style="margin:-4px 0 10px">リングやFitでは部位とセット数が分からないので、ここで補います。</p>
+    <div class="chips" id="mg">
+      <label><input type="checkbox" value="chest">胸</label><label><input type="checkbox" value="back">背中</label>
+      <label><input type="checkbox" value="legs">脚</label><label><input type="checkbox" value="shoulders">肩</label>
+      <label><input type="checkbox" value="arms">腕</label><label><input type="checkbox" value="glutes">お尻</label>
+      <label><input type="checkbox" value="core">体幹</label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input type="text" id="woName" placeholder="内容（例: ベンチ・スクワット）" style="flex:2 1 160px">
+      <input type="number" id="woSets" placeholder="セット" style="flex:1 1 70px">
+      <input type="number" id="woMin" placeholder="分" style="flex:1 1 70px">
+    </div>
+    <label class="small ink2" style="display:flex;gap:6px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="woGym" checked>リング・Fitを着けずに行った（体重と時間から消費を計算して、この日の消費に足す）</label>
+    <button class="btn" id="woSave" style="width:100%;margin-top:10px">筋トレを保存</button>
+    <p class="status" id="woStatus" aria-live="polite"></p>
+    <div class="list" id="wos"></div>
+  </section>
+
+  <section class="card" aria-labelledby="hSet">
+    <details>
+      <summary id="hSet">プロフィール（目標計算に使用）</summary>
+      <div class="grid2" style="margin-top:10px">
+        <label>体重 kg<input type="number" step="0.1" id="sWeight"></label>
+        <label>性別<select id="sSex"><option value="male">男性</option><option value="female">女性</option></select></label>
+        <label>基礎代謝 kcal（任意）<input type="number" id="sBmr"></label>
+      </div>
+      <p class="small muted">基礎代謝は、スクショに「活動消費」しか出ないときの総消費の計算に使います。SOXAI や体組成計の値を入れてください。</p>
+      <button class="btn" id="sSave">保存</button> <span class="status" id="sStatus"></span>
+    </details>
+  </section>
+
+  </div>
+  <div id="viewReport" class="stack" hidden>
+    <p class="small muted" id="rSub" style="margin:0">集計しています…</p>
+    <div class="tiles" id="rTiles"></div>
+    <section class="card"><h2>1日ごとの総カロリー（摂取 − 消費）</h2><div id="rNet"></div></section>
+    <section class="card"><h2>摂取カロリーと消費カロリー</h2><div id="rIB"></div><h3>表で見る</h3><div class="scroll" id="rTable"></div></section>
+    <section class="card"><h2>たんぱく質（筋肉維持チェック）</h2><div id="rProt"></div></section>
+    <section class="card"><h2>食べたもの・飲んだもの</h2><div id="rItems"></div></section>
+    <section class="card"><h2>よく食べているもの・飲んでいるもの</h2><div class="two"><div><h3>食べ物（回数）</h3><div id="rFoods"></div></div><div><h3>飲み物（回数）</h3><div id="rDrinks"></div></div></div></section>
+    <section class="card"><h2>食事・飲み物についての注意点</h2><div class="notes" id="rFoodNotes"></div></section>
+    <section class="card"><h2>運動内容</h2><div class="two"><div><h3>種類別の時間</h3><div id="rExTypes"></div></div><div><h3>鍛えた部位（週の回数）</h3><div id="rMuscles"></div></div></div><h3>記録</h3><div class="scroll" id="rWo"></div></section>
+    <section class="card"><h2>運動についての特徴・注意点</h2><div class="notes" id="rExNotes"></div></section>
+    <p class="small muted">写真からのカロリー推定と、ウェアラブルの消費カロリーにはどちらも誤差があります。体重の週平均の推移と合わせて判断してください。</p>
+  </div>
+  <p class="small muted" id="capNote" hidden></p>
+</main>
+<div id="tip" hidden></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const hm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const fmt = (v) => (v == null || v === "" || isNaN(v)) ? "—" : Math.round(+v).toLocaleString("ja-JP");
+  const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
+  const NUTR = ["kcal", "protein_g", "fat_g", "carb_g", "fiber_g", "salt_g", "alcohol_g"];
+  const WO_JA = { strength: "筋トレ", walking: "ウォーキング", running: "ランニング", cycling: "サイクリング", swimming: "水泳", hiit: "HIIT", yoga: "ヨガ", other: "その他" };
+  const MG_JA = { chest: "胸", back: "背中", legs: "脚", shoulders: "肩", arms: "腕", glutes: "お尻", core: "体幹" };
+
+  let db = null, sample = null, assets = null;
+  let profile = {}, meals = [], health = null, workouts = [];
+  let unsub = [];
+  const now = new Date();
+  $("day").value = ymd(now);
+  const h = now.getHours();
+  $("slot").value = h < 10 ? "朝食" : h < 15 ? "昼食" : h < 20 ? "夕食" : "間食・飲み物";
+
+  function setStatus(id, text, err) { const el = $(id); el.textContent = text; el.classList.toggle("err", !!err); }
+
+  // ---------------- render ----------------
+  function burnOf(hd) {
+    if (!hd) return null;
+    const extra = workouts.reduce((a, w) => a + (w.add_to_burn ? (+w.kcal || 0) : 0), 0);
+    if (hd.total_burn_kcal) return +hd.total_burn_kcal + extra;
+    const base = hd.bmr_kcal || profile.bmr_kcal;
+    if (hd.active_kcal != null && base) return +base + +hd.active_kcal + extra;
+    return null;
+  }
+  // ウェアラブルを外していた筋トレの上乗せ分: (3.5 MET − 1) × 体重 × 時間（Compendium 2011）。時間が無ければ 1セット3分
+  function gymKcal(minutes, sets) {
+    const m = minutes || (sets ? sets * 3 : 0);
+    if (!m) return null;
+    return Math.round(2.5 * (profile.body_weight_kg || 70) * m / 60);
+  }
+  function render() {
+    const intake = meals.reduce((a, m) => a + (+m.kcal || 0), 0);
+    const prot = meals.reduce((a, m) => a + (+m.protein_g || 0), 0);
+    const burn = burnOf(health);
+    $("bIn").textContent = meals.length ? fmt(intake) : "—";
+    $("bOut").textContent = fmt(burn);
+    const net = meals.length && burn != null ? intake - burn : null;
+    const bn = $("bNet");
+    bn.textContent = net == null ? "—" : (net > 0 ? "+" : "") + fmt(net);
+    bn.className = net == null ? "" : net < 0 ? "net-neg" : "net-pos";
+    const goal = profile.body_weight_kg ? Math.round(profile.body_weight_kg * 2) : null;
+    $("pNow").textContent = Math.round(prot);
+    $("pGoal").textContent = goal ?? "体重を設定";
+    $("pBar").style.width = goal ? Math.min(100, prot / goal * 100) + "%" : "0%";
+
+    const today = $("day").value === ymd(new Date());
+    const late = today && new Date().getHours() >= 21;
+    const dl = $("deadline");
+    dl.textContent = today ? (late ? "21時を過ぎました（このまま送れば22時に反映）" : "21時までに送信 → 22時のレポートに反映") : "過去の日の記録";
+    dl.classList.toggle("late", late && new Date().getHours() >= 22);
+
+    const list = $("meals");
+    list.replaceChildren();
+    if (!meals.length) {
+      const p = document.createElement("p"); p.className = "empty";
+      p.textContent = "この日の食事はまだありません。写真を撮ると品目・カロリー・たんぱく質を推定して保存します。";
+      list.append(p);
+    }
+    for (const m of meals) {
+      const row = document.createElement("div"); row.className = "entry";
+      let pic;
+      if (m.photo_id) { pic = document.createElement("img"); pic.alt = ""; pic.src = "/_blob/" + m.photo_id; }
+      else { pic = document.createElement("div"); pic.className = "ph"; }
+      const mid = document.createElement("div");
+      const t = document.createElement("b"); t.textContent = m.slot || "";
+      const tm = document.createElement("span"); tm.className = "small muted"; tm.textContent = " " + (m.time || "");
+      const nm = document.createElement("div"); nm.className = "name";
+      nm.textContent = (m.items || []).map((i) => i.name + (i.amount ? `（${i.amount}）` : "")).join("・") || "品目なし";
+      mid.append(t, tm, nm);
+      if (m.comment) { const c = document.createElement("div"); c.className = "small muted"; c.textContent = m.comment; mid.append(c); }
+      const r = document.createElement("div"); r.className = "r";
+      r.append(Object.assign(document.createElement("div"), { textContent: fmt(m.kcal) + " kcal" }),
+               Object.assign(document.createElement("div"), { textContent: "P " + fmt(m.protein_g) + " g" }));
+      const del = document.createElement("button"); del.className = "btn small"; del.textContent = "削除";
+      del.onclick = () => confirmDelete(del, () => db.doc("meals/" + m._id).delete());
+      r.append(del);
+      row.append(pic, mid, r); list.append(row);
+    }
+
+    const hn = $("healthNow"); hn.replaceChildren();
+    if (health) {
+      const parts = [];
+      if (health.total_burn_kcal) parts.push(`総消費 ${fmt(health.total_burn_kcal)} kcal`);
+      if (health.active_kcal != null) parts.push(`活動 ${fmt(health.active_kcal)} kcal`);
+      if (health.steps) parts.push(`${fmt(health.steps)} 歩`);
+      if (health.sleep_min) parts.push(`睡眠 ${(health.sleep_min / 60).toFixed(1)} 時間`);
+      if (health.weight_kg) parts.push(`体重 ${health.weight_kg} kg`);
+      hn.textContent = "保存済み: " + (parts.join("・") || "—");
+    } else hn.textContent = "この日の消費データはまだありません。";
+
+    const wl = $("wos"); wl.replaceChildren();
+    for (const w of workouts) {
+      const row = document.createElement("div"); row.className = "wo";
+      const groups = (w.muscle_groups || []).map((g) => MG_JA[g] || g).join("・");
+      row.append(Object.assign(document.createElement("div"), {
+        textContent: `${WO_JA[w.type] || w.type}${w.name ? "：" + w.name : ""}${groups ? "（" + groups + "）" : ""}${w.sets ? " " + w.sets + "セット" : ""}${w.minutes ? " " + w.minutes + "分" : ""}`,
+      }));
+      const del = document.createElement("button"); del.className = "btn small"; del.textContent = "削除";
+      del.onclick = () => confirmDelete(del, () => db.doc("workouts/" + w._id).delete());
+      row.append(del); wl.append(row);
+    }
+  }
+  function confirmDelete(btn, fn) {
+    if (btn.dataset.armed) { fn().catch((e) => alertStatus(e)); return; }
+    btn.dataset.armed = "1"; btn.textContent = "本当に削除";
+    setTimeout(() => { delete btn.dataset.armed; btn.textContent = "削除"; }, 3000);
+  }
+  function alertStatus(e) { setStatus("mealStatus", "操作できませんでした: " + (e?.message || e), true); }
+
+  // ---------------- subscriptions ----------------
+  function subscribe() {
+    unsub.forEach((u) => u()); unsub = [];
+    if (!db) return;
+    const d = $("day").value;
+    unsub.push(db.collection("meals").where("date", "==", d).onSnapshot((s) => {
+      meals = s.docs.map((x) => ({ _id: x.id, ...x.data() })).sort((a, b) => (a.time || "").localeCompare(b.time || "")); render();
+    }, () => {}));
+    unsub.push(db.doc("health/" + d).onSnapshot((s) => { health = s.exists ? s.data() : null; render(); }, () => {}));
+    unsub.push(db.collection("workouts").where("date", "==", d).onSnapshot((s) => {
+      workouts = s.docs.map((x) => ({ _id: x.id, ...x.data() })); render();
+    }, () => {}));
+    reportSubscribe();
+  }
+  $("day").onchange = subscribe;
+
+  // ---------------- meal photo ----------------
+  const MEAL_PROMPT = (note) => `あなたは管理栄養士です。添付の写真は食事または飲み物です。品目ごとに分け、日本食品標準成分表（八訂）を目安に、写っている量の栄養量を推定してください。
+- 器の大きさ・箸・パッケージなど量の手がかりを使う。栄養成分表示が写っていればそれを優先。
+- 飲み物も1品目にする（水・お茶・ブラックコーヒーは0kcal）。アルコール飲料は純アルコール量(g)も推定。
+- ultra_processed は NOVA分類4（菓子・菓子パン・カップ麺・加工肉・清涼飲料など）なら true。
+${note ? "- 本人のメモ（量の補足として優先）: " + note : ""}
+JSONオブジェクトだけを返す:
+{"items":[{"name":"品名","kind":"food または drink","amount":"量の目安","kcal":0,"protein_g":0,"fat_g":0,"carb_g":0,"fiber_g":0,"salt_g":0,"alcohol_g":0,"ultra_processed":false}],"confidence":"high/medium/low","comment":"推定の前提や不確かな点を一言"}`;
+
+  $("mealFile").onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    if (!sample || !db) { setStatus("mealStatus", "この画面では写真の解析か保存が使えません。claude.ai にログインして開いてください。", true); return; }
+    $("mealPick").setAttribute("aria-disabled", "true");
+    setStatus("mealStatus", "写真を解析しています…（10〜30秒）");
+    try {
+      const note = $("mealNote").value.trim();
+      const [res, up] = await Promise.all([
+        sample.json(MEAL_PROMPT(note), { images: [f] }),
+        assets ? assets.upload(f).catch(() => null) : Promise.resolve(null),
+      ]);
+      const items = (res?.items || []).map((i) => {
+        const o = { name: String(i.name || "不明"), kind: i.kind === "drink" ? "drink" : "food", amount: String(i.amount || ""), ultra_processed: !!i.ultra_processed };
+        for (const k of NUTR) o[k] = Math.max(0, num(i[k]) ?? 0);
+        return o;
+      });
+      const tot = {}; for (const k of NUTR) tot[k] = Math.round(items.reduce((a, i) => a + i[k], 0) * 10) / 10;
+      const t = new Date();
+      const day = $("day").value;
+      await db.collection("meals").add({
+        date: day, time: day === ymd(t) ? hm(t) : ({ "朝食": "07:30", "昼食": "12:30", "夕食": "19:30" }[$("slot").value] || "21:00"),
+        slot: $("slot").value, items, ...tot, confidence: String(res?.confidence || ""), comment: String(res?.comment || ""),
+        note, photo_id: up?.id || null, created_at: t.toISOString(),
+      });
+      $("mealNote").value = "";
+      setStatus("mealStatus", `保存しました：${items.map((i) => i.name).join("・") || "品目なし"}　合計 ${fmt(tot.kcal)} kcal・たんぱく質 ${fmt(tot.protein_g)} g`);
+    } catch (err) {
+      const msg = err?.code === "not_granted" ? "Claude への質問が許可されていません。ページの権限を確認してください。"
+        : err?.code === "rate_limited" ? "混み合っています。少し待ってからもう一度送ってください。"
+        : "解析か保存に失敗しました。もう一度試してください（" + (err?.message || err) + "）";
+      setStatus("mealStatus", msg, true);
+    } finally { $("mealPick").removeAttribute("aria-disabled"); }
+  };
+
+  // ---------------- screenshots ----------------
+  const SHOT_PROMPT = `添付画像は、スマホの健康アプリ（Google Fit、Android ヘルスコネクト、SOXAI RING のアプリなど）の画面のスクリーンショットです。画面に表示されている数値だけを読み取ってください。表示されていない項目は null にし、推測で埋めないこと。
+- total_burn_kcal は基礎代謝込みの1日の総消費（Google Fit の「カロリー」や「総消費カロリー」）。active_kcal は運動・活動による消費だけ（「アクティブ」「活動カロリー」）。どちらか判断できない場合は note に書く。
+- 睡眠は合計時間を分に換算（例: 6時間50分 → 410）。
+- 画面に運動の記録（ウォーキング、ランニング、筋トレなど）があれば workouts に入れる。type は strength / walking / running / cycling / swimming / hiit / yoga / other のいずれか。
+- 画面に日付があれば date に YYYY-MM-DD で。年が無ければ ${new Date().getFullYear()} 年とする。
+- 複数枚ある場合は統合して1つにする（同じ運動を重複させない）。
+JSONオブジェクトだけを返す:
+{"date":null,"total_burn_kcal":null,"active_kcal":null,"bmr_kcal":null,"steps":null,"sleep_min":null,"weight_kg":null,"body_fat_pct":null,"resting_hr":null,"workouts":[{"type":"walking","name":"","minutes":null,"kcal":null}],"source":"google_fit / health_connect / soxai","note":""}`;
+  let pending = null;
+  const FIELDS = ["total_burn_kcal", "active_kcal", "steps", "sleep_min", "weight_kg", "body_fat_pct"];
+
+  $("shotFile").onchange = async (e) => {
+    const files = [...e.target.files]; e.target.value = "";
+    if (!files.length) return;
+    if (!sample || !db) { setStatus("shotStatus", "この画面ではスクショの解析か保存が使えません。claude.ai にログインして開いてください。", true); return; }
+    let max = 5;
+    try { max = (await sample.limits())?.images?.maxCount || 5; } catch (_) {}
+    if (files.length > max) { setStatus("shotStatus", `一度に送れるのは ${max} 枚までです。分けて送ってください。`, true); return; }
+    setStatus("shotStatus", `${files.length} 枚を読み取っています…`);
+    try {
+      const r = await sample.json(SHOT_PROMPT, { images: files });
+      pending = r || {};
+      for (const k of FIELDS) $("f_" + k).value = pending[k] ?? "";
+      const wbox = $("shotWorkouts"); wbox.replaceChildren();
+      (pending.workouts || []).filter((w) => w && (w.minutes || w.kcal || w.name)).forEach((w, i) => {
+        const lab = document.createElement("label"); lab.className = "small";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true; cb.dataset.i = i;
+        lab.append(cb, document.createTextNode(` ${WO_JA[w.type] || "その他"}${w.name ? "：" + w.name : ""}${w.minutes ? " " + w.minutes + "分" : ""}${w.kcal ? " " + w.kcal + "kcal" : ""} を運動として保存`));
+        wbox.append(lab);
+      });
+      const d = pending.date && /^\d{4}-\d{2}-\d{2}$/.test(pending.date) ? pending.date : null;
+      const dayNote = d && d !== $("day").value ? `画面の日付は ${d} です。保存先は上で選んでいる ${$("day").value} になります（日付を変えるなら上の日付を変更してから保存）。` : "";
+      $("shotNote").textContent = [dayNote, pending.note || ""].filter(Boolean).join(" ");
+      $("shotConfirm").hidden = false;
+      setStatus("shotStatus", "読み取りました。数値を確認して保存してください。");
+    } catch (err) {
+      setStatus("shotStatus", "読み取りに失敗しました（" + (err?.message || err) + "）。画面全体が写ったスクショで試してください。", true);
+    }
+  };
+  $("shotCancel").onclick = () => { $("shotConfirm").hidden = true; pending = null; setStatus("shotStatus", ""); };
+  $("shotSave").onclick = async () => {
+    if (!pending || !db) return;
+    const d = $("day").value;
+    const body = { date: d, updated_at: new Date().toISOString() };
+    for (const k of FIELDS) { const v = num($("f_" + k).value); if (v != null) body[k] = v; }
+    if (num(pending.bmr_kcal) != null) body.bmr_kcal = num(pending.bmr_kcal);
+    if (num(pending.resting_hr) != null) body.resting_hr = num(pending.resting_hr);
+    const src = String(pending.source || "screenshot").slice(0, 40);
+    body.sources = [...new Set([...(health?.sources || []), src])];
+    $("shotSave").disabled = true;
+    try {
+      const ref = db.doc("health/" + d);
+      if (health) await ref.update(body); else await ref.set(body);
+      const picks = [...$("shotWorkouts").querySelectorAll("input:checked")].map((c) => pending.workouts[+c.dataset.i]);
+      for (const w of picks) {
+        await db.collection("workouts").add({ date: d, type: WO_JA[w.type] ? w.type : "other", name: String(w.name || ""),
+          minutes: num(w.minutes), kcal: num(w.kcal), muscle_groups: [], sets: null, source: src });
+      }
+      $("shotConfirm").hidden = true; pending = null;
+      setStatus("shotStatus", "保存しました。");
+    } catch (err) { setStatus("shotStatus", "保存できませんでした（" + (err?.message || err) + "）", true); }
+    $("shotSave").disabled = false;
+  };
+
+  // ---------------- workouts ----------------
+  $("woSave").onclick = async () => {
+    if (!db) { setStatus("woStatus", "保存できません。claude.ai にログインして開いてください。", true); return; }
+    const mg = [...document.querySelectorAll("#mg input:checked")].map((c) => c.value);
+    if (!mg.length && !$("woName").value.trim()) { setStatus("woStatus", "部位か内容を入れてください。", true); return; }
+    $("woSave").disabled = true;
+    try {
+      await db.collection("workouts").add({ date: $("day").value, type: "strength", name: $("woName").value.trim(),
+        sets: num($("woSets").value), minutes: num($("woMin").value), muscle_groups: mg, source: "manual",
+        kcal: $("woGym").checked ? gymKcal(num($("woMin").value), num($("woSets").value)) : null, add_to_burn: $("woGym").checked });
+      document.querySelectorAll("#mg input").forEach((c) => (c.checked = false));
+      $("woName").value = $("woSets").value = $("woMin").value = "";
+      setStatus("woStatus", "保存しました。");
+    } catch (err) { setStatus("woStatus", "保存できませんでした（" + (err?.message || err) + "）", true); }
+    $("woSave").disabled = false;
+  };
+
+  // ---------------- profile ----------------
+  $("sSave").onclick = async () => {
+    if (!db) return;
+    const body = { body_weight_kg: num($("sWeight").value), sex: $("sSex").value, bmr_kcal: num($("sBmr").value) };
+    try { await db.doc("settings/profile").set(body); setStatus("sStatus", "保存しました"); }
+    catch (err) { setStatus("sStatus", "保存できませんでした", true); }
+  };
+
+  // ================= 週間レポート（データベースから常に最新を集計） =================
+  // app/analysis.py と同じ判定ルール。根拠文献は SOURCES。
+  const SOURCES = {
+    hall2008: ["Hall KD. Int J Obes. 2008;32:573-576.", "https://doi.org/10.1038/sj.ijo.0803720", "体重1kg減≒約7,700kcalは初期の目安。"],
+    helms2014: ["Helms ER, et al. J Int Soc Sports Nutr. 2014;11:20.", "https://doi.org/10.1186/1550-2783-11-20", "筋量を守るなら減量ペースは体重の0.5〜1%/週。"],
+    garthe2011: ["Garthe I, et al. Int J Sport Nutr Exerc Metab. 2011;21:97-104.", "https://doi.org/10.1123/ijsnem.21.2.97", "週0.7%のゆっくり減量で除脂肪量を維持。"],
+    murphy2022: ["Murphy C, Koehler K. Scand J Med Sci Sports. 2022;32:125-137.", "https://doi.org/10.1111/sms.14075", "約500kcal/日を超える不足は除脂肪量の増加を阻害しやすい。"],
+    morton2018: ["Morton RW, et al. Br J Sports Med. 2018;52:376-384.", "https://doi.org/10.1136/bjsports-2017-097608", "筋量増加の効果は約1.6g/kg/日で頭打ち（上限2.2g/kg）。"],
+    longland2016: ["Longland TM, et al. Am J Clin Nutr. 2016;103:738-746.", "https://doi.org/10.3945/ajcn.115.119339", "大きな不足下でも2.4g/kg＋高強度トレで除脂肪量が増えた。"],
+    jager2017: ["Jäger R, et al. J Int Soc Sports Nutr. 2017;14:20.", "https://doi.org/10.1186/s12970-017-0177-8", "1食20〜40g、3〜4時間おきに。"],
+    schoenfeld2018: ["Schoenfeld BJ, Aragon AA. J Int Soc Sports Nutr. 2018;15:10.", "https://doi.org/10.1186/s12970-018-0215-1", "1食0.4g/kgを1日4食以上。"],
+    schoenfeld2016freq: ["Schoenfeld BJ, et al. Sports Med. 2016;46:1689-1697.", "https://doi.org/10.1007/s40279-016-0543-8", "各部位を週2回以上が週1回より有利。"],
+    schoenfeld2017vol: ["Schoenfeld BJ, et al. J Sports Sci. 2017;35:1073-1082.", "https://doi.org/10.1080/02640414.2016.1210197", "部位ごとに週10セット以上で筋量増加が大きい。"],
+    wilson2012: ["Wilson JM, et al. J Strength Cond Res. 2012;26:2293-2307.", "https://doi.org/10.1519/JSC.0b013e31823a3e2d", "有酸素（特にランニング）は量が多いほど筋トレ効果を干渉。"],
+    nedeltcheva2010: ["Nedeltcheva AV, et al. Ann Intern Med. 2010;153:435-441.", "https://doi.org/10.7326/0003-4819-153-7-201010050-00006", "睡眠5.5時間では除脂肪量の減少が60%多かった。"],
+    parr2014: ["Parr EB, et al. PLoS One. 2014;9:e88384.", "https://doi.org/10.1371/journal.pone.0088384", "運動後の飲酒で筋たんぱく合成が24〜37%低下。"],
+    hall2019: ["Hall KD, et al. Cell Metab. 2019;30:67-77.", "https://doi.org/10.1016/j.cmet.2019.05.008", "超加工食品中心だと1日約500kcal多く食べた。"],
+    shcherbina2017: ["Shcherbina A, et al. J Pers Med. 2017;7:3.", "https://doi.org/10.3390/jpm7020003", "ウェアラブルの消費カロリーは誤差20%以上。"],
+    paluch2022: ["Paluch AE, et al. Lancet Public Health. 2022;7:e219-e228.", "https://doi.org/10.1016/S2468-2667(21)00302-9", "1日8,000〜10,000歩まで多いほど良い。"],
+    mhlw_dri2020: ["厚生労働省「日本人の食事摂取基準（2020年版）」", "https://www.mhlw.go.jp/stf/newpage_08517.html", "食塩は男性7.5g未満・女性6.5g未満、食物繊維は男性21g以上・女性18g以上。"],
+    mhlw_alcohol: ["厚生労働省 e-ヘルスネット「飲酒のガイドライン」", "https://www.e-healthnet.mhlw.go.jp/information/alcohol/a-03-003.html", "節度ある飲酒は純アルコール約20g/日。"],
+  };
+  const STRENGTH = new Set(["strength", "weight_training", "筋トレ"]);
+  const MUSCLE_JA = { chest: "胸", back: "背中", legs: "脚", shoulders: "肩", arms: "腕", core: "体幹", glutes: "お尻", full_body: "全身" };
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const f0 = (v) => (v == null || !isFinite(v)) ? "—" : Math.round(v).toLocaleString("ja-JP");
+  const sgn = (v) => (v == null || !isFinite(v)) ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v)).toLocaleString("ja-JP");
+  const avg = (a) => { a = a.filter((v) => v != null && isFinite(v)); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; };
+  let wMeals = [], wHealth = {}, wWorkouts = [], rUnsub = [];
+
+  function weekDays(endStr) {
+    const [y, m, d] = endStr.split("-").map(Number);
+    return Array.from({ length: 7 }, (_, i) => { const t = new Date(y, m - 1, d - 6 + i); return ymd(t); });
+  }
+  function reportSubscribe() {
+    rUnsub.forEach((u) => u()); rUnsub = [];
+    if (!db) return;
+    const days = weekDays($("day").value), s = days[0], e = days[6];
+    const q = (c) => db.collection(c).where("date", ">=", s).where("date", "<=", e);
+    rUnsub.push(q("meals").onSnapshot((x) => { wMeals = x.docs.map((d) => d.data()); renderReport(); }, () => {}));
+    rUnsub.push(q("health").onSnapshot((x) => { wHealth = {}; x.docs.forEach((d) => { const v = d.data(); wHealth[v.date] = v; }); renderReport(); }, () => {}));
+    rUnsub.push(q("workouts").onSnapshot((x) => { wWorkouts = x.docs.map((d) => d.data()); renderReport(); }, () => {}));
+  }
+
+  function analyze() {
+    const days = weekDays($("day").value);
+    const now = new Date(), today = ymd(now);
+    const weights = days.map((d) => wHealth[d]?.weight_kg).filter((v) => v);
+    const bw = weights.length ? +weights[weights.length - 1] : (+profile.body_weight_kg || 70);
+    const daily = days.map((k) => {
+      const ms = wMeals.filter((m) => m.date === k).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      const h = wHealth[k] || {};
+      const wos = wWorkouts.filter((w) => w.date === k);
+      const sum = (f) => ms.reduce((a, m) => a + (+m[f] || 0), 0);
+      let burn = h.total_burn_kcal != null ? +h.total_burn_kcal : null;
+      const base = h.bmr_kcal || profile.bmr_kcal;
+      if (burn == null && h.active_kcal != null && base) burn = +base + +h.active_kcal;
+      const extra = wos.reduce((a, w) => a + (w.add_to_burn ? (+w.kcal || 0) : 0), 0);
+      if (burn != null) burn += extra;
+      const intake = sum("kcal");
+      const dt = new Date(k + "T00:00:00");
+      return {
+        date: k, wd: "日月火水木金土"[dt.getDay()], meals: ms, workouts: wos, intake, burn, extra,
+        net: burn != null && ms.length ? intake - burn : null,
+        protein: sum("protein_g"), fat: sum("fat_g"), carb: sum("carb_g"), fiber: sum("fiber_g"), salt: sum("salt_g"), alcohol: sum("alcohol_g"),
+        proteinMeals: ms.filter((m) => (+m.protein_g || 0) >= 0.4 * bw * 0.85).length,
+        steps: h.steps ?? null, sleep: h.sleep_min ?? null, weight: h.weight_kg ?? null,
+        partial: k === today && now.getHours() < 21,
+      };
+    });
+    const logged = daily.filter((x) => x.meals.length && !x.partial);
+    const detailed = logged.filter((x) => x.salt > 0 || x.fiber > 0);
+    const s = {
+      start: days[0], end: days[6], bw, daysLogged: logged.length,
+      avgIntake: avg(logged.map((x) => x.intake)), avgBurn: avg(daily.map((x) => x.burn)),
+      avgNet: avg(daily.filter((x) => x.net != null && !x.partial).map((x) => x.net)),
+      avgProtein: avg(logged.map((x) => x.protein)), avgSalt: avg(detailed.map((x) => x.salt)), avgFiber: avg(detailed.map((x) => x.fiber)),
+      alcohol: daily.reduce((a, x) => a + x.alcohol, 0), avgSteps: avg(daily.map((x) => x.steps)),
+      avgSleepH: (avg(daily.map((x) => x.sleep)) || 0) / 60 || null,
+      wFirst: weights[0] ?? null, wLast: weights[weights.length - 1] ?? null, tlo: -770, thi: -513,
+    };
+    s.proj = s.avgNet != null ? s.avgNet * 30 / 7700 : null;
+    // 食品
+    const foodC = new Map(), drinkC = new Map(); let upf = 0, drink = 0, tot = 0;
+    for (const x of daily) for (const m of x.meals) for (const it of m.items || []) {
+      const k = it.kcal || 0, n = it.name || "不明", mp = it.kind === "drink" ? drinkC : foodC;
+      const o = mp.get(n) || { name: n, count: 0, kcal: 0 }; o.count++; o.kcal += k; mp.set(n, o);
+      tot += k; if (it.ultra_processed) upf += k; if (it.kind === "drink") drink += k;
+    }
+    s.upf = tot ? upf / tot : 0; s.drinkShare = tot ? drink / tot : 0;
+    const top = (mp, n) => [...mp.values()].sort((a, b) => b.count - a.count || b.kcal - a.kcal).slice(0, n);
+    // 運動
+    const strength = wWorkouts.filter((w) => STRENGTH.has(w.type));
+    const hits = {}, sets = {}, minT = {}, kcalT = {};
+    for (const w of strength) {
+      const g = (w.muscle_groups || []).filter(Boolean);
+      for (const x of g) { hits[x] = (hits[x] || 0) + 1; if (w.sets) sets[x] = (sets[x] || 0) + w.sets / g.length; }
+    }
+    for (const w of wWorkouts) { minT[w.type] = (minT[w.type] || 0) + (+w.minutes || 0); kcalT[w.type] = (kcalT[w.type] || 0) + (+w.kcal || 0); }
+    const ex = {
+      strengthDays: new Set(strength.map((w) => w.date)).size, running: minT.running || 0,
+      types: Object.keys(minT).map((t) => ({ name: WO_JA[t] || t, minutes: Math.round(minT[t]), kcal: Math.round(kcalT[t]) })).sort((a, b) => b.kcal - a.kcal),
+      muscles: Object.keys(hits).map((g) => ({ name: MUSCLE_JA[g] || g, count: hits[g], sets: Math.round(sets[g] || 0) })).sort((a, b) => b.count - a.count),
+    };
+    return { s, daily, foods: top(foodC, 8), drinks: top(drinkC, 6), ex, foodNotes: foodNotes(s, daily), exNotes: exNotes(s, ex) };
+  }
+
+  const N = (level, title, body, src) => ({ level, title, body, src });
+  function foodNotes(s, daily) {
+    const out = [], bw = s.bw;
+    if (s.daysLogged < 5) out.push(N("warn", "記録日数が不足", `今週の食事記録は${s.daysLogged}日分です。記録漏れがあると収支が実際より大きくマイナスに見えます。`, ["shcherbina2017"]));
+    if (s.avgNet != null) {
+      const net = s.avgNet, p = s.proj, head = `平均収支は${sgn(net)}kcal/日（推定${p.toFixed(1).replace("-", "−")}kg/月）。`;
+      if (net > s.thi + 200) out.push(N("warn", "カロリー収支のマイナスが足りない", head + `月2〜3kg減には${s.tlo}〜${s.thi}kcal/日が必要です。まず飲み物・間食から100〜300kcal削るのが筋肉を守りやすい方法です。`, ["hall2008"]));
+      else if (net < -1000) out.push(N("alert", "マイナスが大きすぎる（筋肉が落ちるリスク）", head + "約500kcalを超える不足は除脂肪量の維持を妨げやすく、週1%を超える減量は筋力低下を招きやすいです。炭水化物を中心に200〜300kcal戻してください。", ["murphy2022", "helms2014", "garthe2011"]));
+      else if (net < s.tlo) out.push(N("warn", "カロリー収支のマイナスがやや大きい", head + `目標は${s.tlo}〜${s.thi}kcal/日で、約${Math.round(s.tlo - net)}kcal超えています。たんぱく質を中心に食べる量を少し戻してください。`, ["hall2008", "murphy2022"]));
+      else if (net > s.thi) out.push(N("info", "カロリー収支は目標にほぼ届いている", head + `目標は${s.tlo}〜${s.thi}kcal/日で、あと約${Math.round(net - s.thi)}kcal足りません。筋トレ中は−500前後が安全です。`, ["hall2008", "murphy2022"]));
+      else out.push(N("good", "カロリー収支は目標範囲", head + `目標の${s.tlo}〜${s.thi}kcal/日に収まっています。筋トレ中は−500前後に寄せるのが安全です。`, ["hall2008", "murphy2022"]));
+      out.push(N("info", "消費カロリーは誤差を見込む", "スマホやリングの消費カロリーは20%以上ずれることがあります。体重の週平均の推移（月2〜3kg減＝週0.5〜0.75kg）で答え合わせをしてください。", ["shcherbina2017"]));
+    }
+    if (s.wFirst && s.wLast) { const pct = (s.wLast - s.wFirst) / s.wFirst * 100; if (pct < -1) out.push(N("alert", "体重の落ち方が速い", `今週は${pct.toFixed(1)}%変化。筋量を守るなら週0.5〜1%が上限の目安です。`, ["helms2014", "garthe2011"])); }
+    if (s.avgProtein != null) {
+      const g = s.avgProtein / bw;
+      if (g < 1.6) out.push(N("alert", "たんぱく質不足（筋肉維持の最重要項目）", `平均${f0(s.avgProtein)}g/日＝${g.toFixed(2)}g/kg。最低1.6g/kg（${Math.round(1.6 * bw)}g）、減量中は2.0〜2.4g/kgを。鶏むね・卵・魚・プロテインで1食20〜40gを足してください。`, ["morton2018", "longland2016", "jager2017"]));
+      else if (g < 2.0) out.push(N("info", "たんぱく質は最低ラインはクリア", `平均${g.toFixed(2)}g/kg。カロリー制限中は2.0g/kg以上（${Math.round(2 * bw)}g〜）でより筋肉が守られやすいです。`, ["longland2016", "helms2014"]));
+      else out.push(N("good", "たんぱく質量は十分", `平均${g.toFixed(2)}g/kg。`, ["morton2018", "longland2016"]));
+      const pm = daily.filter((x) => x.meals.length && !x.partial).reduce((a, x) => a + x.proteinMeals, 0) / Math.max(1, s.daysLogged);
+      if (pm < 3) out.push(N("info", "たんぱく質の配分", `1食${Math.round(0.4 * bw)}g（0.4g/kg）以上の食事が1日平均${pm.toFixed(1)}回。3〜4回に分けると筋合成に有利です。`, ["schoenfeld2018", "jager2017"]));
+    }
+    const male = (profile.sex || "male") === "male", sl = male ? 7.5 : 6.5, ft = male ? 21 : 18;
+    if (s.avgSalt != null && s.avgSalt > sl) out.push(N("warn", "塩分が多い", `平均${s.avgSalt.toFixed(1)}g/日（目標${sl}g未満）。むくみで体重が一時的に増え、判断を誤りやすくなります。麺や鍋のスープ・漬物・加工肉を控えめに。`, ["mhlw_dri2020"]));
+    if (s.avgFiber != null && s.avgFiber < ft) out.push(N("info", "食物繊維が不足", `平均${f0(s.avgFiber)}g/日（目標${ft}g以上）。野菜・海藻・きのこ・もち麦・豆類を。`, ["mhlw_dri2020"]));
+    if (s.upf > 0.3) out.push(N("warn", "加工食品の比率が高い", `摂取カロリーの${Math.round(s.upf * 100)}%が超加工食品です。`, ["hall2019"]));
+    if (s.drinkShare > 0.1) out.push(N("warn", "飲み物のカロリー", `摂取カロリーの${Math.round(s.drinkShare * 100)}%が飲み物。最初に削る候補です。`, ["hall2019"]));
+    if (s.alcohol > 0) {
+      const heavy = daily.filter((x) => x.alcohol > 20), post = heavy.filter((x) => x.workouts.some((w) => STRENGTH.has(w.type)));
+      out.push(N(heavy.length ? "warn" : "info", "アルコール", `今週の純アルコール合計${f0(s.alcohol)}g。1日20gを超えた日が${heavy.length}日。` + (post.length ? `うち${post.length}日は筋トレ当日。運動後の飲酒は筋たんぱく合成を24〜37%下げます。` : ""), ["mhlw_alcohol", "parr2014"]));
+    }
+    return out;
+  }
+  function exNotes(s, ex) {
+    const out = [];
+    if (ex.strengthDays < 2) out.push(N("alert", "筋トレ頻度が不足", `今週の筋トレは${ex.strengthDays}日。各部位を週2回以上を確保してください。`, ["schoenfeld2016freq", "helms2014"]));
+    else out.push(N("good", "筋トレ頻度は良好", `今週の筋トレは${ex.strengthDays}日。減量中も重量（強度）を落とさないことが筋量維持の鍵です。`, ["schoenfeld2016freq", "helms2014"]));
+    const once = ex.muscles.filter((m) => m.count < 2).map((m) => m.name);
+    if (once.length) out.push(N("info", "週1回しか刺激していない部位", `${once.join("・")}は今週1回のみ。週2回に分けると有利です。`, ["schoenfeld2016freq"]));
+    const low = ex.muscles.filter((m) => m.sets && m.sets < 10).map((m) => m.name);
+    if (low.length) out.push(N("info", "部位別ボリューム", `${low.join("・")}は記録上、週10セット未満。筋量を増やしたい部位は週10セット以上が目安です。`, ["schoenfeld2017vol"]));
+    if (ex.running > 120 && ex.strengthDays) out.push(N("warn", "有酸素の干渉効果", `ランニング${Math.round(ex.running)}分。ウォーキング・自転車への置き換えを。`, ["wilson2012"]));
+    if (s.avgSteps != null) out.push(s.avgSteps < 8000 ? N("info", "日常の歩数", `平均${f0(s.avgSteps)}歩/日。8,000〜10,000歩を目安に。`, ["paluch2022", "wilson2012"]) : N("good", "日常の歩数は十分", `平均${f0(s.avgSteps)}歩/日。`, ["paluch2022"]));
+    if (s.avgSleepH) out.push(s.avgSleepH < 7 ? N("alert", "睡眠不足は筋肉を減らす", `平均睡眠${s.avgSleepH.toFixed(1)}時間。同じ食事制限でも睡眠5.5時間では除脂肪量の減少が60%多くなりました。7時間以上を最優先に。`, ["nedeltcheva2010"]) : N("good", "睡眠時間", `平均${s.avgSleepH.toFixed(1)}時間。`, ["nedeltcheva2010"]));
+    return out;
+  }
+
+  // ---------- 描画 ----------
+  function niceMax(v) { if (v <= 0) return 1; const m = 10 ** Math.floor(Math.log10(v)); for (const k of [1, 2, 2.5, 5, 10]) if (v <= k * m) return k * m; return 10 * m; }
+  function ticks(v) { const st = niceMax(v / 5), n = Math.ceil(v / st); return [st * n, Array.from({ length: n + 1 }, (_, i) => st * i)]; }
+  function col(x, y0, w, h, r = 4) {
+    if (Math.abs(h) < .5) return "";
+    r = Math.min(r, Math.abs(h), w / 2);
+    if (h > 0) { const t = y0 - h; return `M${x},${y0}V${t + r}Q${x},${t} ${x + r},${t}H${x + w - r}Q${x + w},${t} ${x + w},${t + r}V${y0}Z`; }
+    const b = y0 - h; return `M${x},${y0}V${b - r}Q${x},${b} ${x + r},${b}H${x + w - r}Q${x + w},${b} ${x + w},${b - r}V${y0}Z`;
+  }
+  const xlab = (d, cx, y) => `<text x="${cx}" y="${y}" class="tick" text-anchor="middle">${+d.date.slice(8)}${d.wd}</text>`;
+  function chartNet(daily, s) {
+    const W = 640, H = 240, L = 54, R = 10, T = 14, B = 30, pw = W - L - R, ph = H - T - B, band = pw / 7, bw = Math.min(24, band * .5);
+    const lim = niceMax(Math.max(...daily.map((d) => Math.abs(d.net ?? 0)), Math.abs(s.tlo) + 100));
+    const y = (v) => T + ph / 2 - v / lim * (ph / 2);
+    let o = `<div class="legend"><span><i style="background:var(--neg)"></i>マイナス（減量方向）</span><span><i style="background:var(--pos)"></i>プラス（超過）</span><span><i style="background:var(--band);outline:1px solid var(--line)"></i>目標帯（${s.tlo}〜${s.thi}）</span></div><svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="1日ごとの総カロリー収支">`;
+    o += `<rect x="${L}" y="${y(s.thi)}" width="${pw}" height="${y(s.tlo) - y(s.thi)}" class="band"/>`;
+    for (const v of [-lim, -lim / 2, lim / 2, lim]) o += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="grid"/>`;
+    for (const v of [-lim, -lim / 2, 0, lim / 2, lim]) o += `<text x="${L - 6}" y="${y(v) + 4}" class="tick" text-anchor="end">${sgn(v)}</text>`;
+    daily.forEach((d, i) => {
+      const cx = L + band * i + band / 2;
+      o += `<g class="hit" data-tip="${esc(`${d.date.slice(5)}（${d.wd}）${d.partial ? "・集計中" : ""}|収支 ${sgn(d.net)} kcal`)}"><rect x="${cx - band / 2}" y="${T}" width="${band}" height="${ph}" fill="transparent"/>`;
+      if (d.net != null) {
+        o += `<path d="${col(cx - bw / 2, y(0), bw, d.net / lim * ph / 2)}" fill="${d.net < 0 ? "var(--neg)" : "var(--pos)"}" ${d.partial ? 'opacity=".5"' : ""}/>`;
+        o += `<text x="${cx}" y="${y(d.net) + (d.net < 0 ? 16 : -6)}" class="val" text-anchor="middle">${sgn(d.net)}</text>`;
+      }
+      o += `</g>` + xlab(d, cx, H - 6);
+    });
+    return o + `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" class="axis"/></svg>`;
+  }
+  function chartIB(daily) {
+    const W = 640, H = 250, L = 54, R = 10, T = 14, B = 30, pw = W - L - R, ph = H - T - B, band = pw / 7, bw = Math.min(20, band / 3);
+    const [vmax, tk] = ticks(Math.max(1000, ...daily.map((d) => Math.max(d.intake, d.burn || 0))));
+    const y = (v) => T + ph - v / vmax * ph;
+    let o = `<div class="legend"><span><i style="background:var(--s1)"></i>摂取</span><span><i style="background:var(--s2)"></i>消費（リング・Fit＋ジム）</span></div><svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="摂取と消費">`;
+    for (const v of tk) o += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" class="tick" text-anchor="end">${f0(v)}</text>`;
+    daily.forEach((d, i) => {
+      const cx = L + band * i + band / 2;
+      o += `<g class="hit" data-tip="${esc(`${d.date.slice(5)}（${d.wd}）|摂取 ${f0(d.intake)} kcal|消費 ${f0(d.burn)} kcal${d.extra ? `（うちジム ${f0(d.extra)}）` : ""}|収支 ${sgn(d.net)} kcal`)}"><rect x="${cx - band / 2}" y="${T}" width="${band}" height="${ph}" fill="transparent"/>`;
+      o += `<path d="${col(cx - bw - 1, y(0), bw, d.intake / vmax * ph)}" fill="var(--s1)"/>`;
+      if (d.burn) o += `<path d="${col(cx + 1, y(0), bw, d.burn / vmax * ph)}" fill="var(--s2)"/>`;
+      o += `</g>` + xlab(d, cx, H - 6);
+    });
+    return o + `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" class="axis"/></svg>`;
+  }
+  function chartProt(daily, bw) {
+    const W = 640, H = 210, L = 54, R = 10, T = 14, B = 30, pw = W - L - R, ph = H - T - B, band = pw / 7, w = Math.min(24, band * .5);
+    const [vmax, tk] = ticks(Math.max(2.0 * bw * 1.15, ...daily.map((d) => d.protein)));
+    const y = (v) => T + ph - v / vmax * ph;
+    let o = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="たんぱく質">`;
+    for (const v of tk) o += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" class="tick" text-anchor="end">${f0(v)}</text>`;
+    daily.forEach((d, i) => {
+      const cx = L + band * i + band / 2;
+      o += `<g class="hit" data-tip="${esc(`${d.date.slice(5)}（${d.wd}）|たんぱく質 ${f0(d.protein)} g（${(d.protein / bw).toFixed(2)} g/kg）`)}"><rect x="${cx - band / 2}" y="${T}" width="${band}" height="${ph}" fill="transparent"/><path d="${col(cx - w / 2, y(0), w, d.protein / vmax * ph)}" fill="var(--s3)"/></g>` + xlab(d, cx, H - 6);
+    });
+    for (const [v, lab] of [[1.6 * bw, "1.6 g/kg（最低）"], [2.0 * bw, "2.0 g/kg（減量中）"]]) o += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="ref"/><text x="${W - R - 4}" y="${y(v) - 4}" class="tick" text-anchor="end">${lab} ${f0(v)} g</text>`;
+    return o + `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" class="axis"/></svg>`;
+  }
+  function hbars(rows, key, unit, color, tip) {
+    if (!rows.length) return `<p class="empty">データがありません</p>`;
+    const mx = Math.max(...rows.map((r) => r[key])) || 1;
+    return `<div class="hbars">` + rows.map((r) => `<div class="hrow hit" data-tip="${esc(tip(r))}"><span class="hl">${esc(r.name)}</span><span class="ht"><span class="hb" style="width:${(r[key] / mx * 100).toFixed(1)}%;background:${color}"></span></span><span class="hv">${f0(r[key])}${unit}</span></div>`).join("") + `</div>`;
+  }
+  const LV = { good: ["✓", "良好"], info: ["i", "ヒント"], warn: ["!", "注意"], alert: ["‼", "要改善"] };
+  const notesHtml = (ns) => ns.map((n) => `<article class="note ${n.level}"><header><span class="badge"><b>${LV[n.level][0]}</b>${LV[n.level][1]}</span><h4>${esc(n.title)}</h4></header><p>${esc(n.body)}</p><details><summary class="small">根拠となる文献</summary><ul>${n.src.map((k) => `<li><a href="${SOURCES[k][1]}" target="_blank" rel="noopener">${esc(SOURCES[k][0])}</a> <span class="muted">${esc(SOURCES[k][2])}</span></li>`).join("")}</ul></details></article>`).join("");
+
+  function renderReport() {
+    if ($("viewReport").hidden) return;
+    const { s, daily, foods, drinks, ex, foodNotes: fn, exNotes: en } = analyze();
+    const wline = s.wFirst && s.wLast ? `　体重 ${s.wFirst} → ${s.wLast} kg` : "";
+    $("rSub").textContent = `${s.start} 〜 ${s.end}${wline}　・記録が変わると自動で更新されます`;
+    const tiles = [
+      ["平均収支", s.avgNet != null ? sgn(s.avgNet) + " kcal" : "—", `目標 ${s.tlo}〜${s.thi}`],
+      ["推定ペース", s.proj != null ? s.proj.toFixed(1).replace("-", "−") + " kg/月" : "—", "目標 −2〜−3 kg/月"],
+      ["平均摂取", f0(s.avgIntake) + (s.avgIntake != null ? " kcal" : ""), `記録 ${s.daysLogged}/7日`],
+      ["平均消費", f0(s.avgBurn) + (s.avgBurn != null ? " kcal" : ""), "リング・Fit＋ジム"],
+      ["たんぱく質", s.avgProtein != null ? (s.avgProtein / s.bw).toFixed(2) + " g/kg" : "—", `目安 2.0 g/kg＝${Math.round(2 * s.bw)} g`],
+      ["筋トレ", ex.strengthDays + " 日", "目安 週2日以上"],
+    ];
+    $("rTiles").innerHTML = tiles.map(([a, b, c]) => `<div class="tile"><div class="tl">${a}</div><div class="tv">${esc(b)}</div><div class="ts">${esc(c)}</div></div>`).join("");
+    $("rNet").innerHTML = chartNet(daily, s);
+    $("rIB").innerHTML = chartIB(daily);
+    $("rTable").innerHTML = `<table><thead><tr><th>日付</th><th class="num">摂取</th><th class="num">消費</th><th class="num">収支</th><th class="num">P(g)</th><th class="num">塩分</th><th class="num">歩数</th><th class="num">睡眠</th></tr></thead><tbody>` +
+      daily.map((d) => `<tr><td>${d.date.slice(5)}（${d.wd}）${d.partial ? '<br><span class="muted">集計中</span>' : ""}</td><td class="num">${f0(d.intake)}</td><td class="num">${f0(d.burn)}</td><td class="num">${sgn(d.net)}</td><td class="num">${f0(d.protein)}</td><td class="num">${d.salt ? d.salt.toFixed(1) : "—"}</td><td class="num">${f0(d.steps)}</td><td class="num">${d.sleep ? (d.sleep / 60).toFixed(1) : "—"}</td></tr>`).join("") + `</tbody></table>`;
+    $("rProt").innerHTML = chartProt(daily, s.bw);
+    $("rItems").innerHTML = daily.map((d) => !d.meals.length ? `<details class="dayd"><summary><b>${d.date.slice(5)}（${d.wd}）</b><span class="muted">記録なし</span></summary></details>` :
+      `<details class="dayd"><summary><b>${d.date.slice(5)}（${d.wd}）</b><span>${f0(d.intake)} kcal・P ${f0(d.protein)} g</span></summary><div class="scroll"><table><thead><tr><th>時刻</th><th>区分</th><th>品目</th><th class="num">kcal</th><th class="num">P</th></tr></thead><tbody>` +
+      d.meals.flatMap((m) => (m.items || []).map((it) => `<tr><td>${esc(m.time)}</td><td>${esc(m.slot)}</td><td>${it.kind === "drink" ? "🥤 " : ""}${esc(it.name)} <span class="muted">${esc(it.amount)}</span></td><td class="num">${f0(it.kcal)}</td><td class="num">${f0(it.protein_g)}</td></tr>`)).join("") + `</tbody></table></div></details>`).join("");
+    $("rFoods").innerHTML = hbars(foods, "count", " 回", "var(--s1)", (r) => `${r.name}|${r.count} 回|計 ${f0(r.kcal)} kcal`);
+    $("rDrinks").innerHTML = hbars(drinks, "count", " 回", "var(--s2)", (r) => `${r.name}|${r.count} 回|計 ${f0(r.kcal)} kcal`);
+    $("rFoodNotes").innerHTML = notesHtml(fn);
+    $("rExTypes").innerHTML = hbars(ex.types, "kcal", " kcal", "var(--s1)", (r) => `${r.name}|${r.minutes} 分|${f0(r.kcal)} kcal`);
+    $("rMuscles").innerHTML = hbars(ex.muscles, "count", " 回", "var(--s3)", (r) => `${r.name}|週 ${r.count} 回|${r.sets || "—"} セット`);
+    const wo = daily.flatMap((d) => d.workouts.map((w) => ({ d, w })));
+    $("rWo").innerHTML = wo.length ? `<table><thead><tr><th>日付</th><th>種類</th><th>内容</th><th class="num">セット</th><th class="num">kcal</th></tr></thead><tbody>` +
+      wo.map(({ d, w }) => `<tr><td>${d.date.slice(5)}（${d.wd}）</td><td>${esc(WO_JA[w.type] || w.type)}</td><td>${esc(w.name)} <span class="muted">${esc((w.muscle_groups || []).map((g) => MUSCLE_JA[g] || g).join("・"))}</span></td><td class="num">${f0(w.sets)}</td><td class="num">${f0(w.kcal)}${w.add_to_burn ? "＋" : ""}</td></tr>`).join("") + `</tbody></table><p class="small muted">kcal の「＋」は、リング・Fit を外していた運動として1日の消費に上乗せした分です。</p>` : `<p class="empty">運動記録がありません</p>`;
+    $("rExNotes").innerHTML = notesHtml(en);
+  }
+
+  // ツールチップ（記録データは textContent で入れる）
+  const tip = $("tip");
+  document.addEventListener("pointerover", (e) => {
+    const el = e.target.closest?.(".hit"); if (!el) return;
+    tip.replaceChildren(); (el.getAttribute("data-tip") || "").split("|").forEach((t, i) => { const n = document.createElement(i ? "span" : "b"); n.textContent = t; tip.append(n); if (i) tip.append(document.createElement("br")); });
+    tip.hidden = false;
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (tip.hidden) return; if (!e.target.closest?.(".hit")) { tip.hidden = true; return; }
+    let x = e.clientX + 14, y = e.clientY + 14; const r = tip.getBoundingClientRect();
+    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14; if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+  });
+
+  // タブ（#report でレポートを直接開ける）
+  function showView(report) {
+    $("viewLog").hidden = report; $("viewReport").hidden = !report;
+    $("tabLog").setAttribute("aria-selected", String(!report)); $("tabReport").setAttribute("aria-selected", String(report));
+    if (report) renderReport();
+  }
+  $("tabLog").onclick = () => { location.hash = ""; showView(false); };
+  $("tabReport").onclick = () => { location.hash = "report"; showView(true); };
+  addEventListener("hashchange", () => showView(location.hash === "#report"));
+  showView(location.hash === "#report");
+
+
+  // ---------------- boot ----------------
+  render();
+  (async () => {
+    const cl = window.claude;
+    if (!cl?.use) { $("capNote").hidden = false; $("capNote").textContent = "claude.ai で開くと記録・解析が使えます。"; return; }
+    [db, sample, assets] = await Promise.all([cl.use("db"), cl.use("sample"), cl.use("assets")]);
+    if (!db || !sample) {
+      $("capNote").hidden = false;
+      $("capNote").textContent = !db ? "記録の保存が使えません。claude.ai にログインして開いてください。" : "写真の解析が使えません。ページの権限設定を確認してください。";
+    }
+    if (db) {
+      db.doc("settings/profile").onSnapshot((s) => {
+        profile = s.exists ? s.data() : {};
+        if (profile.body_weight_kg && document.activeElement !== $("sWeight")) $("sWeight").value = profile.body_weight_kg;
+        if (profile.sex) $("sSex").value = profile.sex;
+        if (profile.bmr_kcal && document.activeElement !== $("sBmr")) $("sBmr").value = profile.bmr_kcal;
+        render(); renderReport();
+      }, () => {});
+      subscribe();
+    }
+  })();
+})();
+</script>
