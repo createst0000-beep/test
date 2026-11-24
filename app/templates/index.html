@@ -83,7 +83,7 @@ a{color:var(--accent)} a.btn{text-decoration:none}
 </form>
 
 <section class="card">
-  <h2>🔔 リマインド（7・12・19・21時）</h2>
+  <h2>🔔 リマインド（8・12・19・21時）</h2>
   <div class="row">
     <button class="btn" id="pushBtn">プッシュ通知をオン</button>
     <button class="btn" id="pushTest">テスト通知</button>
@@ -152,7 +152,7 @@ document.getElementById('pushBtn').onclick = async () => {
     const { publicKey } = await (await fetch('/api/push/key')).json();
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(publicKey) });
     await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json', ...hdr() }, body: JSON.stringify(sub) });
-    msg.textContent = '通知をオンにしました。7・12・19・21時に撮影リマインド、22時にレポート通知が届きます。';
+    msg.textContent = '通知をオンにしました。8・12・19・21時に撮影リマインド、22時にレポート通知が届きます。';
   } catch (err) { msg.textContent = err.message; }
 };
 document.getElementById('pushTest').onclick = async () => {
