@@ -201,9 +201,17 @@ def food_notes(s, daily):
                                f"平均収支は{net:+.0f}kcal/日（推定{-proj:.1f}kg/月）。1日約500kcalを超える不足は筋トレによる除脂肪量の維持・増加を妨げやすく、週1%を超える減量は筋力低下を招きやすいです。炭水化物を中心に200〜300kcal戻してください。",
                                ["murphy2022", "helms2014", "garthe2011"]))
         else:
-            inside = tlo <= net <= thi
-            notes.append(_note(GOOD if inside else INFO, "カロリー収支は目標範囲" if inside else "カロリー収支は目標にほぼ届いている",
-                               f"平均収支は{net:+.0f}kcal/日（推定{-proj:.1f}kg/月）。目標は{tlo}〜{thi}kcal/日{'で、範囲に収まっています' if inside else f'で、あと約{net - thi:.0f}kcal足りません'}。ただし約500kcalを超える不足は筋量維持に不利になり得るため、下限側（−500前後）に寄せるのが筋トレ中は安全です。",
+            if net < tlo:
+                title, lvl = "カロリー収支のマイナスがやや大きい", WARN
+                body = f"目標は{tlo}〜{thi}kcal/日で、約{tlo - net:.0f}kcal超えています。筋トレ中は不足を広げすぎず、たんぱく質を中心に食べる量を少し戻してください。"
+            elif net > thi:
+                title, lvl = "カロリー収支は目標にほぼ届いている", INFO
+                body = f"目標は{tlo}〜{thi}kcal/日で、あと約{net - thi:.0f}kcal足りません。"
+            else:
+                title, lvl = "カロリー収支は目標範囲", GOOD
+                body = f"目標の{tlo}〜{thi}kcal/日に収まっています。"
+            notes.append(_note(lvl, title,
+                               f"平均収支は{net:+.0f}kcal/日（推定{-proj:.1f}kg/月）。{body}約500kcalを超える不足は筋量維持に不利になり得るため、筋トレ中は−500前後に寄せるのが安全です。",
                                ["hall2008", "murphy2022"]))
         notes.append(_note(INFO, "消費カロリーは誤差を見込む",
                            "スマホやリングの消費カロリーは20%以上ずれることがあります。収支だけでなく、体重の週平均の推移（月2〜3kg減＝週0.5〜0.75kg）で答え合わせをしてください。",
