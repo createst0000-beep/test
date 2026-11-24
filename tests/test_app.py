@@ -66,3 +66,12 @@ def test_server_endpoints(env):
     assert ics.count("BEGIN:VEVENT") == 5 and "RRULE:FREQ=DAILY" in ics and "ACTION:AUDIO" in ics
     assert c.get("/api/push/key").json["publicKey"]
     assert c.get("/report").status_code == 200
+
+
+def test_gym_workout_adds_to_burn(env):
+    with env.db.connect() as con:
+        env.health.ingest({"date": "2026-11-24", "total_burn_kcal": 1900}, con)
+        env.db.add_workout(con, date="2026-11-24", type="strength", kcal=28, sets=3, add_to_burn=True, ext_id="g1")
+        env.db.add_workout(con, date="2026-11-24", type="walking", kcal=100, ext_id="w1")  # ウェアラブル計測分は足さない
+        data = env.analysis.analyze_week(date(2026, 11, 24), con)
+    assert data["daily"][-1]["burn"] == 1928 and data["daily"][-1]["extra_burn"] == 28

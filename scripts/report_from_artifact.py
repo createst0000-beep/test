@@ -50,7 +50,7 @@ def main():
     if settings.get("sex"):
         os.environ["SEX"] = settings["sex"]
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from app import db, health, report  # noqa: E402  (環境変数を設定してから読み込む)
+    from app import db, energy, health, report  # noqa: E402  (環境変数を設定してから読み込む)
 
     bmr = settings.get("bmr_kcal")
     with db.connect() as con:
@@ -72,9 +72,14 @@ def main():
         for i, w in enumerate(_docs(exp.get("workouts"))):
             if not w.get("date"):
                 continue
-            db.add_workout(con, date=w["date"], type=health.normalize_type(w.get("type")), name=w.get("name"),
-                           minutes=w.get("minutes"), kcal=w.get("kcal"), muscle_groups=w.get("muscle_groups"),
-                           sets=w.get("sets"), source=w.get("source") or "artifact", ext_id=f"artifact:{i}")
+            wtype = health.normalize_type(w.get("type"))
+            kcal = w.get("kcal")
+            if kcal is None and w.get("add_to_burn") and wtype == "strength":
+                kcal = energy.strength_kcal(float(settings.get("body_weight_kg") or 70), w.get("minutes"), w.get("sets"))
+            db.add_workout(con, date=w["date"], type=wtype, name=w.get("name"),
+                           minutes=w.get("minutes"), kcal=kcal, muscle_groups=w.get("muscle_groups"),
+                           sets=w.get("sets"), source=w.get("source") or "artifact", ext_id=f"artifact:{i}",
+                           add_to_burn=bool(w.get("add_to_burn")))
     end = date.fromisoformat(a.end) if a.end else None
     path = report.build(end, Path(a.out))
     # claude.ai Artifact 用: 公開時に外枠が付くので、doctype/html/head/body タグを外したものも書き出す

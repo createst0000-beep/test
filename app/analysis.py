@@ -57,6 +57,10 @@ def analyze_week(end: date | None = None, con=None):
         burn = h.get("total_burn_kcal")
         if burn is None and h.get("bmr_kcal") is not None:
             burn = (h.get("bmr_kcal") or 0) + (h.get("active_kcal") or 0)
+        # ウェアラブルを外していた運動（ジムなど）の上乗せ分
+        extra = sum(w.get("kcal") or 0 for w in wo_by_day.get(k, []) if w.get("add_to_burn"))
+        if burn is not None:
+            burn += extra
         items = [it | {"slot": m["slot"], "time": m["eaten_at"][11:16]} for m in ms for it in m["items"]]
         daily.append({
             "date": k,
@@ -76,6 +80,7 @@ def analyze_week(end: date | None = None, con=None):
             "photos": [m["photo"] for m in ms if m["photo"]],
             "steps": h.get("steps"),
             "active": h.get("active_kcal"),
+            "extra_burn": round(extra),
             "sleep_min": h.get("sleep_min"),
             "weight": h.get("weight_kg"),
             "workouts": wo_by_day.get(k, []),

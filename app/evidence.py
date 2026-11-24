@@ -81,6 +81,11 @@ SOURCES = {
         "url": "https://doi.org/10.1016/S2468-2667(21)00302-9",
         "point": "60歳未満では1日8,000〜10,000歩まで歩数が多いほど死亡リスクが低下した。",
     },
+    "ainsworth2011": {
+        "cite": "Ainsworth BE, et al. 2011 Compendium of Physical Activities: a second update of codes and MET values. Med Sci Sports Exerc. 2011;43:1575-1581.",
+        "url": "https://doi.org/10.1249/MSS.0b013e31821ece12",
+        "point": "筋トレ（複数種目・8〜15回）は3.5 MET、高強度のボディビル系は6.0 MET。ジムでの消費の推定に使用。",
+    },
     "mhlw_dri2020": {
         "cite": "厚生労働省「日本人の食事摂取基準（2020年版）」",
         "url": "https://www.mhlw.go.jp/stf/newpage_08517.html",

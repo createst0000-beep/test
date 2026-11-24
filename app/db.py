@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS workouts (
     muscle_groups TEXT,              -- カンマ区切り（chest,back,legs,shoulders,arms,core）
     sets INTEGER,
     source TEXT,
-    ext_id TEXT UNIQUE               -- 取り込み元の ID（重複防止）
+    ext_id TEXT UNIQUE,              -- 取り込み元の ID（重複防止）
+    add_to_burn INTEGER DEFAULT 0    -- 1: ウェアラブル未装着の運動。kcal を1日の消費に上乗せする
 );
 """
 
@@ -57,6 +58,10 @@ def connect():
     con = sqlite3.connect(config.DB_PATH)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    try:  # 古いDBへの列追加
+        con.execute("ALTER TABLE workouts ADD COLUMN add_to_burn INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     try:
         yield con
         con.commit()
@@ -98,13 +103,13 @@ def upsert_health(con, date, source, **fields):
 
 
 def add_workout(con, *, date, type, name=None, minutes=None, kcal=None,
-                muscle_groups=None, sets=None, source="manual", ext_id=None):
+                muscle_groups=None, sets=None, source="manual", ext_id=None, add_to_burn=False):
     if isinstance(muscle_groups, (list, tuple)):
         muscle_groups = ",".join(muscle_groups)
     con.execute(
-        """INSERT OR REPLACE INTO workouts (date, type, name, minutes, kcal, muscle_groups, sets, source, ext_id)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
-        (date, type, name, minutes, kcal, muscle_groups, sets, source, ext_id),
+        """INSERT OR REPLACE INTO workouts (date, type, name, minutes, kcal, muscle_groups, sets, source, ext_id, add_to_burn)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (date, type, name, minutes, kcal, muscle_groups, sets, source, ext_id, 1 if add_to_burn else 0),
     )
 
 
