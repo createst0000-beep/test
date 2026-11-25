@@ -150,7 +150,8 @@ def analyze_week(end: date | None = None, con=None):
         for g in groups:
             muscle_hits[g] += 1
             if w.get("sets"):
-                muscle_sets[g] += w["sets"] / len(groups)
+                # 複合種目は、対象に挙げた部位それぞれに1セットとして数える
+                muscle_sets[g] += w["sets"]
     minutes_by_type = Counter()
     kcal_by_type = Counter()
     for w in workouts:

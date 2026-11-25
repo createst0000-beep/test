@@ -89,6 +89,18 @@ th{color:var(--ink2);font-weight:500} .num{text-align:right;font-variant-numeric
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px} .two>*{min-width:0} @media (max-width:560px){.two{grid-template-columns:1fr}}
 h3{font-size:.88rem;margin:12px 0 6px;color:var(--ink2)}
 details.dayd{border-top:1px solid var(--line);padding:7px 0} details.dayd summary{display:flex;justify-content:space-between;gap:8px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px}
+.mrow{display:grid;grid-template-columns:3.2em auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.86rem}
+.mname{font-weight:600} .mstat{color:var(--ink2);font-variant-numeric:tabular-nums;font-size:.8rem}
+.dots{display:flex;gap:4px} .dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);display:inline-block} .dot.on{background:var(--s3);border-color:var(--s3)}
+.mbadge{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink2);white-space:nowrap} .mbadge b{margin-right:3px}
+.mrow.good .mbadge b,.mrow.ok .mbadge b{color:var(--good)} .mrow.warn .mbadge b{color:var(--warn)} .mrow.none{opacity:.6}
+.daycard{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;overflow:hidden}
+.dayhead{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);font-size:.88rem}
+.exrow{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-top:1px solid var(--line)} .dayhead+.exrow{border-top:0}
+.exmain{min-width:0} .exname{font-weight:600;font-size:.9rem;overflow-wrap:anywhere} .exdetail{font-size:.86rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.exmeta{color:var(--ink2);font-size:.78rem;margin-top:2px} .exkcal{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink2);font-size:.84rem}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin:2px 2px 0 0;font-size:.7rem;color:var(--ink2)}
 #tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.14);z-index:9;white-space:nowrap}
 #tip b{display:block}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -194,7 +206,7 @@ details.dayd{border-top:1px solid var(--line);padding:7px 0} details.dayd summar
     <section class="card"><h2>食べたもの・飲んだもの</h2><div id="rItems"></div></section>
     <section class="card"><h2>よく食べているもの・飲んでいるもの</h2><div class="two"><div><h3>食べ物（回数）</h3><div id="rFoods"></div></div><div><h3>飲み物（回数）</h3><div id="rDrinks"></div></div></div></section>
     <section class="card"><h2>食事・飲み物についての注意点</h2><div class="notes" id="rFoodNotes"></div></section>
-    <section class="card"><h2>運動内容</h2><div class="two"><div><h3>種類別の時間</h3><div id="rExTypes"></div></div><div><h3>鍛えた部位（週の回数）</h3><div id="rMuscles"></div></div></div><h3>記録</h3><div class="scroll" id="rWo"></div></section>
+    <section class="card"><h2>運動内容</h2><div id="rExercise"></div></section>
     <section class="card"><h2>運動についての特徴・注意点</h2><div class="notes" id="rExNotes"></div></section>
     <p class="small muted">写真からのカロリー推定と、ウェアラブルの消費カロリーにはどちらも誤差があります。体重の週平均の推移と合わせて判断してください。</p>
   </div>
@@ -564,13 +576,14 @@ JSONオブジェクトだけを返す:
     const hits = {}, sets = {}, minT = {}, kcalT = {};
     for (const w of strength) {
       const g = (w.muscle_groups || []).filter(Boolean);
-      for (const x of g) { hits[x] = (hits[x] || 0) + 1; if (w.sets) sets[x] = (sets[x] || 0) + w.sets / g.length; }
+      for (const x of g) { hits[x] = (hits[x] || 0) + 1; if (w.sets) sets[x] = (sets[x] || 0) + w.sets; }
     }
     for (const w of wWorkouts) { minT[w.type] = (minT[w.type] || 0) + (+w.minutes || 0); kcalT[w.type] = (kcalT[w.type] || 0) + (+w.kcal || 0); }
     const ex = {
       strengthDays: new Set(strength.map((w) => w.date)).size, running: minT.running || 0,
       types: Object.keys(minT).map((t) => ({ name: WO_JA[t] || t, minutes: Math.round(minT[t]), kcal: Math.round(kcalT[t]) })).sort((a, b) => b.kcal - a.kcal),
       muscles: Object.keys(hits).map((g) => ({ name: MUSCLE_JA[g] || g, count: hits[g], sets: Math.round(sets[g] || 0) })).sort((a, b) => b.count - a.count),
+      hits, sets,
     };
     return { s, daily, foods: top(foodC, 8), drinks: top(drinkC, 6), ex, foodNotes: foodNotes(s, daily), exNotes: exNotes(s, ex) };
   }
@@ -687,6 +700,38 @@ JSONオブジェクトだけを返す:
   const LV = { good: ["✓", "良好"], info: ["i", "ヒント"], warn: ["!", "注意"], alert: ["‼", "要改善"] };
   const notesHtml = (ns) => ns.map((n) => `<article class="note ${n.level}"><header><span class="badge"><b>${LV[n.level][0]}</b>${LV[n.level][1]}</span><h4>${esc(n.title)}</h4></header><p>${esc(n.body)}</p><details><summary class="small">根拠となる文献</summary><ul>${n.src.map((k) => `<li><a href="${SOURCES[k][1]}" target="_blank" rel="noopener">${esc(SOURCES[k][0])}</a> <span class="muted">${esc(SOURCES[k][2])}</span></li>`).join("")}</ul></details></article>`).join("");
 
+  const MUSCLE_ORDER = ["chest", "back", "legs", "shoulders", "arms", "glutes", "core"];
+  function exerciseHtml(daily, ex) {
+    const wos = daily.flatMap((d) => d.workouts);
+    if (!wos.length) return `<p class="empty">今週の運動記録はまだありません。</p>`;
+    const str = wos.filter((w) => STRENGTH.has(w.type)), car = wos.filter((w) => !STRENGTH.has(w.type));
+    const totalSets = str.reduce((a, w) => a + (+w.sets || 0), 0), carMin = car.reduce((a, w) => a + (+w.minutes || 0), 0);
+    const gym = wos.reduce((a, w) => a + (w.add_to_burn ? (+w.kcal || 0) : 0), 0);
+    let o = `<div class="tiles">` + [["筋トレ", ex.strengthDays + " 日", "目安 週2日以上"], ["筋トレのセット数", totalSets + " セット", "記録のある種目の合計"],
+      ["有酸素", carMin ? f0(carMin) + " 分" : "—", "傾斜ウォークなど"], ["ジムの消費（上乗せ分）", f0(gym) + " kcal", "リング・Fit 未装着の分"]]
+      .map(([a, b, c]) => `<div class="tile"><div class="tl">${a}</div><div class="tv">${esc(b)}</div><div class="ts">${c}</div></div>`).join("") + `</div>`;
+    o += `<h3>部位ごとの達成状況（目安: 週2回・週10セット）</h3><div class="mgrid">` + MUSCLE_ORDER.map((g) => {
+      const h = ex.hits[g] || 0, st = Math.round(ex.sets[g] || 0);
+      const [cls, mark, lab] = h >= 2 && st >= 10 ? ["good", "✓", "達成"] : h >= 2 ? ["ok", "○", "頻度OK"] : h === 1 ? ["warn", "△", "あと1回"] : ["none", "—", "未実施"];
+      const dots = Array.from({ length: Math.max(2, h) }, (_, i) => `<i class="dot${i < h ? " on" : ""}"></i>`).join("");
+      return `<div class="mrow ${cls}"><span class="mname">${MUSCLE_JA[g]}</span><span class="dots">${dots}</span><span class="mstat">${h}回・${st || "—"}セット</span><span class="mbadge"><b>${mark}</b>${lab}</span></div>`;
+    }).join("") + `</div><h3>日ごとの記録</h3>`;
+    for (const d of daily) {
+      if (!d.workouts.length) continue;
+      const kc = d.workouts.reduce((a, w) => a + (w.add_to_burn ? (+w.kcal || 0) : 0), 0);
+      o += `<div class="daycard"><div class="dayhead"><b>${d.date.slice(5)}（${d.wd}）</b><span class="muted">${d.workouts.length}種目${kc ? `・上乗せ ${f0(kc)} kcal` : ""}</span></div>` +
+        d.workouts.map((w) => {
+          const full = String(w.name || WO_JA[w.type] || w.type).trim(), i = full.indexOf(" ");
+          const nm = i > 0 ? full.slice(0, i) : full, det = i > 0 ? full.slice(i + 1) : "";
+          const meta = [WO_JA[w.type] || w.type, w.minutes ? f0(w.minutes) + "分" : "", w.sets ? w.sets + "セット" : ""].filter(Boolean).join(" ・ ");
+          const chips = (w.muscle_groups || []).map((g) => `<span class="chip">${esc(MUSCLE_JA[g] || g)}</span>`).join("");
+          const k = w.kcal ? (w.add_to_burn ? "+" : "") + f0(w.kcal) + " kcal" : "";
+          return `<div class="exrow"><div class="exmain"><div class="exname">${esc(nm)}</div>${det ? `<div class="exdetail">${esc(det)}</div>` : ""}<div class="exmeta">${esc(meta)} ${chips}</div></div><div class="exkcal">${esc(k)}</div></div>`;
+        }).join("") + `</div>`;
+    }
+    return o + `<p class="small muted">「+」付きの kcal は、リング・Fit を外していた運動として1日の消費に足した分です（安静時の分は除いています）。</p>`;
+  }
+
   function renderReport() {
     if ($("viewReport").hidden) return;
     const { s, daily, foods, drinks, ex, foodNotes: fn, exNotes: en } = analyze();
@@ -712,11 +757,7 @@ JSONオブジェクトだけを返す:
     $("rFoods").innerHTML = hbars(foods, "count", " 回", "var(--s1)", (r) => `${r.name}|${r.count} 回|計 ${f0(r.kcal)} kcal`);
     $("rDrinks").innerHTML = hbars(drinks, "count", " 回", "var(--s2)", (r) => `${r.name}|${r.count} 回|計 ${f0(r.kcal)} kcal`);
     $("rFoodNotes").innerHTML = notesHtml(fn);
-    $("rExTypes").innerHTML = hbars(ex.types, "kcal", " kcal", "var(--s1)", (r) => `${r.name}|${r.minutes} 分|${f0(r.kcal)} kcal`);
-    $("rMuscles").innerHTML = hbars(ex.muscles, "count", " 回", "var(--s3)", (r) => `${r.name}|週 ${r.count} 回|${r.sets || "—"} セット`);
-    const wo = daily.flatMap((d) => d.workouts.map((w) => ({ d, w })));
-    $("rWo").innerHTML = wo.length ? `<table><thead><tr><th>日付</th><th>種類</th><th>内容</th><th class="num">セット</th><th class="num">kcal</th></tr></thead><tbody>` +
-      wo.map(({ d, w }) => `<tr><td>${d.date.slice(5)}（${d.wd}）</td><td>${esc(WO_JA[w.type] || w.type)}</td><td>${esc(w.name)} <span class="muted">${esc((w.muscle_groups || []).map((g) => MUSCLE_JA[g] || g).join("・"))}</span></td><td class="num">${f0(w.sets)}</td><td class="num">${f0(w.kcal)}${w.add_to_burn ? "＋" : ""}</td></tr>`).join("") + `</tbody></table><p class="small muted">kcal の「＋」は、リング・Fit を外していた運動として1日の消費に上乗せした分です。</p>` : `<p class="empty">運動記録がありません</p>`;
+    $("rExercise").innerHTML = exerciseHtml(daily, ex);
     $("rExNotes").innerHTML = notesHtml(en);
   }
 

@@ -160,6 +160,80 @@ def hbar_list(rows, value_key, unit, color="var(--s1)", label_key="name", tip_fn
     return "".join(out)
 
 
+MUSCLE_ORDER = ["chest", "back", "legs", "shoulders", "arms", "glutes", "core"]
+
+
+def exercise_html(daily, ex):
+    """運動内容: 週のまとめ → 部位ごとの達成状況 → 日ごとのカード。"""
+    wos = [(d, w) for d in daily for w in d["workouts"]]
+    if not wos:
+        return '<p class="muted">今週の運動記録はまだありません。</p>'
+    strength = [w for _, w in wos if w["type"] in analysis.STRENGTH_TYPES]
+    cardio = [w for _, w in wos if w["type"] not in analysis.STRENGTH_TYPES]
+    total_sets = sum(w.get("sets") or 0 for w in strength)
+    cardio_min = sum(w.get("minutes") or 0 for w in cardio)
+    gym_kcal = sum(w.get("kcal") or 0 for _, w in wos if w.get("add_to_burn"))
+    summary = [
+        ("筋トレ", f'{ex["strength_sessions"]} 日', "目安 週2日以上"),
+        ("筋トレのセット数", f"{total_sets} セット", "記録のある種目の合計"),
+        ("有酸素", f"{cardio_min:.0f} 分" if cardio_min else "—", "傾斜ウォークなど"),
+        ("ジムの消費（上乗せ分）", f"{gym_kcal:,.0f} kcal", "リング・Fit 未装着の分"),
+    ]
+    out = ['<div class="tiles">' + "".join(
+        f'<div class="tile"><div class="tl">{a}</div><div class="tv">{b}</div><div class="ts">{c}</div></div>'
+        for a, b, c in summary) + "</div>"]
+
+    # 部位ごとの達成状況
+    hits, sets = {}, {}
+    for w in strength:
+        for g in [g for g in (w.get("muscle_groups") or "").split(",") if g]:
+            hits[g] = hits.get(g, 0) + 1
+            sets[g] = sets.get(g, 0) + (w.get("sets") or 0)
+    rows = []
+    for g in MUSCLE_ORDER:
+        h, st = hits.get(g, 0), sets.get(g, 0)
+        if h >= 2 and st >= 10:
+            cls, mark, lab = "good", "✓", "達成"
+        elif h >= 2:
+            cls, mark, lab = "ok", "○", "頻度OK"
+        elif h == 1:
+            cls, mark, lab = "warn", "△", "あと1回"
+        else:
+            cls, mark, lab = "none", "—", "未実施"
+        dots = "".join(f'<i class="dot{" on" if i < h else ""}"></i>' for i in range(max(2, h)))
+        rows.append(f'<div class="mrow {cls}"><span class="mname">{analysis.MUSCLE_JA[g]}</span>'
+                    f'<span class="dots" aria-label="週{h}回">{dots}</span>'
+                    f'<span class="mstat">{h}回・{st or "—"}セット</span>'
+                    f'<span class="mbadge"><b>{mark}</b>{lab}</span></div>')
+    out.append('<h3>部位ごとの達成状況（目安: 週2回・週10セット）</h3><div class="mgrid">' + "".join(rows) + "</div>")
+
+    # 日ごとのカード
+    out.append("<h3>日ごとの記録</h3>")
+    for d in daily:
+        if not d["workouts"]:
+            continue
+        kcal = sum((w.get("kcal") or 0) for w in d["workouts"] if w.get("add_to_burn"))
+        items = []
+        for w in d["workouts"]:
+            name = w.get("name") or analysis.WORKOUT_JA.get(w["type"], w["type"])
+            # 「種目名 重量×回数×セット」形式なら、種目名と内容に分けて表示する
+            name, detail = (name.split(" ", 1) + [""])[:2] if " " in name.strip() else (name, "")
+            kind = analysis.WORKOUT_JA.get(w["type"], w["type"])
+            chips = "".join(f'<span class="chip">{E(analysis.MUSCLE_JA.get(g, g))}</span>'
+                            for g in (w.get("muscle_groups") or "").split(",") if g)
+            meta = " ・ ".join(x for x in [kind, f'{w["minutes"]:.0f}分' if w.get("minutes") else "",
+                                            f'{w["sets"]}セット' if w.get("sets") else ""] if x)
+            k = f'+{w["kcal"]:.0f} kcal' if w.get("kcal") and w.get("add_to_burn") else (f'{w["kcal"]:.0f} kcal' if w.get("kcal") else "")
+            items.append(f'<div class="exrow"><div class="exmain"><div class="exname">{E(name)}</div>'
+                         + (f'<div class="exdetail">{E(detail)}</div>' if detail else "")
+                         + f'<div class="exmeta">{E(meta)} {chips}</div></div><div class="exkcal">{E(k)}</div></div>')
+        out.append(f'<div class="daycard"><div class="dayhead"><b>{d["date"][5:]}（{d["weekday"]}）</b>'
+                   f'<span class="muted">{len(d["workouts"])}種目{f"・上乗せ {kcal:,.0f} kcal" if kcal else ""}</span></div>'
+                   + "".join(items) + "</div>")
+    out.append('<p class="muted" style="font-size:.78rem">「+」付きの kcal は、リング・Fit を外していた運動として1日の消費に足した分です（安静時の分は除いています）。</p>')
+    return "".join(out)
+
+
 # ------------------------------------------------------------ page
 def render(data):
     s, daily, fr, ex = data["summary"], data["daily"], data["frequent"], data["exercise"]
@@ -202,19 +276,6 @@ def render(data):
                          f'<span>{_fmt(d["intake"])} kcal・P {d["protein"]:.0f} g</span></summary>'
                          f'<table><thead><tr><th>時刻</th><th>区分</th><th>品目</th><th class="num">kcal</th><th class="num">P(g)</th></tr></thead><tbody>{rows}</tbody></table></details>')
 
-    # 運動内容（日別）
-    wo_rows = []
-    for d in daily:
-        for w in d["workouts"]:
-            groups = "・".join(analysis.MUSCLE_JA.get(g, g) for g in (w.get("muscle_groups") or "").split(",") if g)
-            wo_rows.append(f'<tr><td>{d["date"][5:]}（{d["weekday"]}）</td><td>{E(analysis.WORKOUT_JA.get(w["type"], w["type"]))}</td>'
-                           f'<td>{E(w.get("name") or "")}{"<span class=muted> " + E(groups) + "</span>" if groups else ""}</td>'
-                           f'<td class="num">{_fmt(w.get("minutes"))}</td><td class="num">{_fmt(w.get("sets"))}</td><td class="num">{_fmt(w.get("kcal"))}</td></tr>')
-    wo_table = (f'<table><thead><tr><th>日付</th><th>種類</th><th>内容</th><th class="num">分</th><th class="num">セット</th><th class="num">kcal</th></tr></thead><tbody>{"".join(wo_rows)}</tbody></table>'
-                if wo_rows else '<p class="muted">運動記録がありません</p>')
-
-    muscle_rows = [{"name": g, "count": c, "sets": ex["muscle_sets"].get(g, 0)} for g, c in sorted(ex["muscle_hits"].items(), key=lambda x: -x[1])]
-
     table_rows = "".join(
         f'<tr><td>{d["date"][5:]}（{d["weekday"]}）{"<br><span class=muted>集計中</span>" if d.get("partial") else ""}</td><td class="num">{_fmt(d["intake"])}</td><td class="num">{_fmt(d["burn"])}</td>'
         f'<td class="num">{_fmt(d["net"])}</td><td class="num">{d["protein"]:.0f}</td><td class="num">{_fmt(d["steps"])}</td>'
@@ -233,10 +294,7 @@ def render(data):
         foods=hbar_list(fr["foods"], "count", " 回", "var(--s1)", tip_fn=lambda r: f"{r['name']}|{r['count']} 回|計 {r['kcal']:,} kcal"),
         drinks=hbar_list(fr["drinks"], "count", " 回", "var(--s2)", tip_fn=lambda r: f"{r['name']}|{r['count']} 回|計 {r['kcal']:,} kcal"),
         food_notes=notes_html(data["food_notes"]),
-        ex_types=hbar_list(ex["minutes_by_type"], "minutes", " 分", "var(--s1)", label_key="label",
-                           tip_fn=lambda r: f"{r['label']}|{r['minutes']} 分|{r['kcal']:,} kcal"),
-        muscles=hbar_list(muscle_rows, "count", " 回", "var(--s3)", tip_fn=lambda r: f"{r['name']}|週 {r['count']} 回|{r['sets']} セット"),
-        wo_table=wo_table,
+        exercise=exercise_html(daily, ex),
         ex_notes=notes_html(data["exercise_notes"]),
     )
 
@@ -284,6 +342,19 @@ details.day{{border-bottom:1px solid var(--line);padding:8px 0}} details.day sum
 .badge{{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink2)}} .badge b{{margin-right:4px}}
 .note.good .badge b{{color:var(--good)}} .note.alert .badge b{{color:var(--critical)}} .note.warn .badge b{{color:var(--serious)}}
 .note details{{font-size:.8rem}} .note summary{{cursor:pointer;color:var(--ink2)}} .note ul{{padding-left:18px;margin:6px 0}} .note a{{color:var(--ink2)}}
+.mgrid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px}}
+.mrow{{display:grid;grid-template-columns:3.5em auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.88rem}}
+.mname{{font-weight:600}} .mstat{{color:var(--ink2);font-variant-numeric:tabular-nums;font-size:.82rem}}
+.dots{{display:flex;gap:4px}} .dot{{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--line);display:inline-block}} .dot.on{{background:var(--s3);border-color:var(--s3)}}
+.mbadge{{font-size:.75rem;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink2);white-space:nowrap}} .mbadge b{{margin-right:3px}}
+.mrow.good .mbadge b{{color:var(--good)}} .mrow.ok .mbadge b{{color:var(--good)}} .mrow.warn .mbadge b{{color:var(--serious)}} .mrow.none{{opacity:.6}}
+.daycard{{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;overflow:hidden}}
+.dayhead{{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line);font-size:.9rem}}
+.exrow{{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-top:1px solid var(--line)}} .dayhead+.exrow{{border-top:0}}
+.exmain{{min-width:0}} .exname{{font-weight:600;font-size:.9rem;overflow-wrap:anywhere}} .exmeta{{color:var(--ink2);font-size:.8rem;margin-top:2px}}
+.exdetail{{font-size:.86rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}}
+.exkcal{{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink2);font-size:.85rem}}
+.chip{{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin:2px 2px 0 0;font-size:.72rem;color:var(--ink2)}}
 #tip{{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;z-index:9;white-space:nowrap}}
 #tip b{{display:block}} .hit:hover path,.hit:hover .hb{{opacity:.8}}
 </style></head><body><main>
@@ -301,8 +372,7 @@ details.day{{border-bottom:1px solid var(--line);padding:8px 0}} details.day sum
 <section><h2>よく食べているもの・飲んでいるもの</h2><div class="two"><div><h3>食べ物（回数）</h3>{foods}</div><div><h3>飲み物（回数）</h3>{drinks}</div></div></section>
 <section><h2>食事・飲み物についての注意点</h2>{food_notes}</section>
 
-<section><h2>運動内容</h2><div class="two"><div><h3>種類別の時間</h3>{ex_types}</div><div><h3>鍛えた部位（週の回数）</h3>{muscles}</div></div>
-<h3>記録</h3><div class="scroll">{wo_table}</div></section>
+<section><h2>運動内容</h2>{exercise}</section>
 <section><h2>運動についての特徴・注意点</h2>{ex_notes}</section>
 <p class="muted" style="font-size:.78rem">写真からのカロリー推定と、ウェアラブルの消費カロリーにはどちらも誤差があります。体重の週平均の推移と合わせて判断してください。持病や服薬がある場合は医師・管理栄養士に相談してください。</p>
 </main><div id="tip"></div>
