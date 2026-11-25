@@ -89,6 +89,13 @@ th{color:var(--ink2);font-weight:500} .num{text-align:right;font-variant-numeric
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px} .two>*{min-width:0} @media (max-width:560px){.two{grid-template-columns:1fr}}
 h3{font-size:.88rem;margin:12px 0 6px;color:var(--ink2)}
 details.dayd{border-top:1px solid var(--line);padding:7px 0} details.dayd summary{display:flex;justify-content:space-between;gap:8px}
+.grows{display:flex;flex-direction:column;gap:6px}
+.grow{display:grid;grid-template-columns:minmax(7em,30%) 1fr auto;gap:10px;align-items:center;font-size:.86rem}
+.gname{font-weight:600} .gbar{height:12px;background:var(--grid);border-radius:0 4px 4px 0} .gbar span{display:block;height:12px;background:var(--s1);border-radius:0 4px 4px 0;min-width:2px}
+.gval{color:var(--ink2);font-size:.78rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media (max-width:560px){.grow{grid-template-columns:1fr auto} .gbar{grid-column:1/-1;order:3}}
+ol.rank{margin:0;padding-left:1.4em;font-size:.86rem} ol.rank li{padding:4px 0;border-bottom:1px solid var(--line)}
+.rwrap{display:flex;justify-content:space-between;gap:10px} .rname{overflow-wrap:anywhere;min-width:0} .rval{color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px}
 .mrow{display:grid;grid-template-columns:3.2em auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.86rem}
 .mname{font-weight:600} .mstat{color:var(--ink2);font-variant-numeric:tabular-nums;font-size:.8rem}
@@ -204,7 +211,7 @@ details.dayd{border-top:1px solid var(--line);padding:7px 0} details.dayd summar
     <section class="card"><h2>摂取カロリーと消費カロリー</h2><div id="rIB"></div><h3>表で見る</h3><div class="scroll" id="rTable"></div></section>
     <section class="card"><h2>たんぱく質（筋肉維持チェック）</h2><div id="rProt"></div></section>
     <section class="card"><h2>食べたもの・飲んだもの</h2><div id="rItems"></div></section>
-    <section class="card"><h2>よく食べているもの・飲んでいるもの</h2><div class="two"><div><h3>食べ物（回数）</h3><div id="rFoods"></div></div><div><h3>飲み物（回数）</h3><div id="rDrinks"></div></div></div></section>
+    <section class="card"><h2>よく食べているもの・飲んでいるもの</h2><div id="rFrequent"></div></section>
     <section class="card"><h2>食事・飲み物についての注意点</h2><div class="notes" id="rFoodNotes"></div></section>
     <section class="card"><h2>運動内容</h2><div id="rExercise"></div></section>
     <section class="card"><h2>運動についての特徴・注意点</h2><div class="notes" id="rExNotes"></div></section>
@@ -562,15 +569,23 @@ JSONオブジェクトだけを返す:
       wFirst: weights[0] ?? null, wLast: weights[weights.length - 1] ?? null, tlo: -770, thi: -513,
     };
     s.proj = s.avgNet != null ? s.avgNet * 30 / 7700 : null;
-    // 食品
-    const foodC = new Map(), drinkC = new Map(); let upf = 0, drink = 0, tot = 0;
+    // 食品（グループ別。app/analysis.py の FOOD_GROUPS と同じ規則）
+    const groups = new Map(), drinks = new Map(), items = []; let upf = 0, drink = 0, tot = 0;
     for (const x of daily) for (const m of x.meals) for (const it of m.items || []) {
-      const k = it.kcal || 0, n = it.name || "不明", mp = it.kind === "drink" ? drinkC : foodC;
-      const o = mp.get(n) || { name: n, count: 0, kcal: 0 }; o.count++; o.kcal += k; mp.set(n, o);
-      tot += k; if (it.ultra_processed) upf += k; if (it.kind === "drink") drink += k;
+      const k = +it.kcal || 0, n = it.name || "不明"; tot += k; if (it.ultra_processed) upf += k;
+      if (it.kind === "drink") { drink += k; const o = drinks.get(n) || { name: n, count: 0, kcal: 0, alcohol: 0 }; o.count++; o.kcal += k; o.alcohol += +it.alcohol_g || 0; drinks.set(n, o); continue; }
+      const g = foodGroup(n), o = groups.get(g) || { name: g, count: 0, kcal: 0, protein: 0, salt: 0 };
+      o.count++; o.kcal += k; o.protein += +it.protein_g || 0; o.salt += +it.salt_g || 0; groups.set(g, o);
+      if (!isAggregate(n)) items.push({ name: n, date: x.date, wd: x.wd, kcal: Math.round(k), protein: Math.round((+it.protein_g || 0) * 10) / 10 });
     }
     s.upf = tot ? upf / tot : 0; s.drinkShare = tot ? drink / tot : 0;
-    const top = (mp, n) => [...mp.values()].sort((a, b) => b.count - a.count || b.kcal - a.kcal).slice(0, n);
+    const fk = [...groups.values()].reduce((a, g) => a + g.kcal, 0) || 1;
+    const freq = {
+      groups: [...groups.values()].map((g) => ({ ...g, share: g.kcal / fk })).sort((a, b) => b.kcal - a.kcal),
+      topKcal: [...items].sort((a, b) => b.kcal - a.kcal).slice(0, 5),
+      topProtein: [...items].sort((a, b) => b.protein - a.protein).slice(0, 5),
+      drinks: [...drinks.values()].sort((a, b) => b.count - a.count),
+    };
     // 運動
     const strength = wWorkouts.filter((w) => STRENGTH.has(w.type));
     const hits = {}, sets = {}, minT = {}, kcalT = {};
@@ -585,7 +600,7 @@ JSONオブジェクトだけを返す:
       muscles: Object.keys(hits).map((g) => ({ name: MUSCLE_JA[g] || g, count: hits[g], sets: Math.round(sets[g] || 0) })).sort((a, b) => b.count - a.count),
       hits, sets,
     };
-    return { s, daily, foods: top(foodC, 8), drinks: top(drinkC, 6), ex, foodNotes: foodNotes(s, daily), exNotes: exNotes(s, ex) };
+    return { s, daily, freq, ex, foodNotes: foodNotes(s, daily), exNotes: exNotes(s, ex) };
   }
 
   const N = (level, title, body, src) => ({ level, title, body, src });
@@ -700,6 +715,31 @@ JSONオブジェクトだけを返す:
   const LV = { good: ["✓", "良好"], info: ["i", "ヒント"], warn: ["!", "注意"], alert: ["‼", "要改善"] };
   const notesHtml = (ns) => ns.map((n) => `<article class="note ${n.level}"><header><span class="badge"><b>${LV[n.level][0]}</b>${LV[n.level][1]}</span><h4>${esc(n.title)}</h4></header><p>${esc(n.body)}</p><details><summary class="small">根拠となる文献</summary><ul>${n.src.map((k) => `<li><a href="${SOURCES[k][1]}" target="_blank" rel="noopener">${esc(SOURCES[k][0])}</a> <span class="muted">${esc(SOURCES[k][2])}</span></li>`).join("")}</ul></details></article>`).join("");
 
+  const FOOD_GROUPS = [
+    ["プロテイン", ["プロテイン"]],
+    ["鶏肉", ["チキン", "鶏", "手羽", "焼き鳥", "焼鳥", "ささみ", "軟骨", "ヤゲン", "砂肝", "砂ぎも"]],
+    ["野菜・海藻・きのこ", ["サラダ", "野菜", "オクラ", "もやし", "ほうれん草", "キャベツ", "レタス", "トマト", "ブロッコリー", "きのこ", "えのき", "海藻", "わかめ"]],
+    ["豚・牛・加工肉", ["豚", "牛", "ベーコン", "ウインナー", "ソーセージ", "ハム", "生姜焼き"]],
+    ["麺類", ["麺", "ラーメン", "そば", "うどん", "パスタ", "中華そば"]],
+    ["スープ・汁物・鍋", ["スープ", "汁", "鍋", "ミネストローネ"]],
+    ["ご飯・パン・穀物", ["ご飯", "おにぎり", "パン", "もち麦", "オートミール", "米"]],
+    ["魚介", ["鮭", "魚", "ツナ", "イカ", "刺身", "したらば", "明太", "サバ", "えび"]],
+    ["大豆製品", ["納豆", "豆腐", "大豆", "枝豆"]],
+    ["卵", ["卵", "たまご"]],
+    ["菓子・甘いもの", ["チョコ", "菓子", "ポテトチップス", "アイス", "ケーキ"]],
+  ];
+  const isAggregate = (n) => /^(朝食|昼食|夕食|朝兼昼食|間食)（/.test(n);
+  const foodGroup = (n) => isAggregate(n) ? "まとめて記録（内訳なし）" : (FOOD_GROUPS.find(([, ws]) => ws.some((w) => n.includes(w))) || ["その他"])[0];
+  function frequentHtml(fr) {
+    if (!fr.groups.length && !fr.drinks.length) return `<p class="empty">データがありません</p>`;
+    let o = `<h3>食品グループ別（カロリーの多い順）</h3><p class="small muted" style="margin:-4px 0 8px">「まとめて記録」は、品目の内訳がなく1食分の合計だけを記録した食事です。</p><div class="grows">` +
+      fr.groups.map((g) => `<div class="grow hit" data-tip="${esc(`${g.name}|${g.count} 品|${f0(g.kcal)} kcal（${Math.round(g.share * 100)}%）|たんぱく質 ${f0(g.protein)} g・塩分 ${g.salt.toFixed(1)} g`)}"><span class="gname">${esc(g.name)}</span><span class="gbar"><span style="width:${(g.share * 100).toFixed(1)}%"></span></span><span class="gval">${g.count}品・${f0(g.kcal)} kcal・P ${f0(g.protein)} g</span></div>`).join("") + `</div>`;
+    const lst = (rows, key, unit) => rows.length ? `<ol class="rank">` + rows.map((r) => `<li><span class="rwrap"><span class="rname">${esc(r.name)}<span class="muted"> ${r.date.slice(5)}（${r.wd}）</span></span><span class="rval">${r[key].toLocaleString("ja-JP")}${unit}</span></span></li>`).join("") + `</ol>` : `<p class="empty">データがありません</p>`;
+    o += `<div class="two"><div><h3>カロリーが多かった品目</h3>${lst(fr.topKcal, "kcal", " kcal")}</div><div><h3>たんぱく質が多かった品目</h3>${lst(fr.topProtein, "protein", " g")}</div></div><h3>飲み物</h3>`;
+    o += fr.drinks.length ? `<ol class="rank">` + fr.drinks.map((d) => `<li><span class="rwrap"><span class="rname">${esc(d.name)}</span><span class="rval">${d.count}回・${f0(d.kcal)} kcal${d.alcohol ? `・アルコール ${d.alcohol.toFixed(1)} g` : ""}</span></span></li>`).join("") + `</ol>` : `<p class="empty">カロリーのある飲み物の記録はありません。</p>`;
+    return o;
+  }
+
   const MUSCLE_ORDER = ["chest", "back", "legs", "shoulders", "arms", "glutes", "core"];
   function exerciseHtml(daily, ex) {
     const wos = daily.flatMap((d) => d.workouts);
@@ -734,7 +774,7 @@ JSONオブジェクトだけを返す:
 
   function renderReport() {
     if ($("viewReport").hidden) return;
-    const { s, daily, foods, drinks, ex, foodNotes: fn, exNotes: en } = analyze();
+    const { s, daily, freq, ex, foodNotes: fn, exNotes: en } = analyze();
     const wline = s.wFirst && s.wLast ? `　体重 ${s.wFirst} → ${s.wLast} kg` : "";
     $("rSub").textContent = `${s.start} 〜 ${s.end}${wline}　・記録が変わると自動で更新されます`;
     const tiles = [
@@ -754,8 +794,7 @@ JSONオブジェクトだけを返す:
     $("rItems").innerHTML = daily.map((d) => !d.meals.length ? `<details class="dayd"><summary><b>${d.date.slice(5)}（${d.wd}）</b><span class="muted">記録なし</span></summary></details>` :
       `<details class="dayd"><summary><b>${d.date.slice(5)}（${d.wd}）</b><span>${f0(d.intake)} kcal・P ${f0(d.protein)} g</span></summary><div class="scroll"><table><thead><tr><th>時刻</th><th>区分</th><th>品目</th><th class="num">kcal</th><th class="num">P</th></tr></thead><tbody>` +
       d.meals.flatMap((m) => (m.items || []).map((it) => `<tr><td>${esc(m.time)}</td><td>${esc(m.slot)}</td><td>${it.kind === "drink" ? "🥤 " : ""}${esc(it.name)} <span class="muted">${esc(it.amount)}</span></td><td class="num">${f0(it.kcal)}</td><td class="num">${f0(it.protein_g)}</td></tr>`)).join("") + `</tbody></table></div></details>`).join("");
-    $("rFoods").innerHTML = hbars(foods, "count", " 回", "var(--s1)", (r) => `${r.name}|${r.count} 回|計 ${f0(r.kcal)} kcal`);
-    $("rDrinks").innerHTML = hbars(drinks, "count", " 回", "var(--s2)", (r) => `${r.name}|${r.count} 回|計 ${f0(r.kcal)} kcal`);
+    $("rFrequent").innerHTML = frequentHtml(freq);
     $("rFoodNotes").innerHTML = notesHtml(fn);
     $("rExercise").innerHTML = exerciseHtml(daily, ex);
     $("rExNotes").innerHTML = notesHtml(en);

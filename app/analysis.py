@@ -10,6 +10,40 @@ MUSCLE_JA = {"chest": "胸", "back": "背中", "legs": "脚", "shoulders": "肩"
 WORKOUT_JA = {"strength": "筋トレ", "walking": "ウォーキング", "running": "ランニング",
               "cycling": "サイクリング", "swimming": "水泳", "hiit": "HIIT", "yoga": "ヨガ", "other": "その他"}
 
+# 食品グループ（上から順に判定。品目名に含まれる語で分類する）
+FOOD_GROUPS = [
+    ("プロテイン", ["プロテイン"]),
+    ("鶏肉", ["チキン", "鶏", "手羽", "焼き鳥", "焼鳥", "ささみ", "軟骨", "ヤゲン", "砂肝", "砂ぎも"]),
+    ("野菜・海藻・きのこ", ["サラダ", "野菜", "オクラ", "もやし", "ほうれん草", "キャベツ", "レタス", "トマト", "ブロッコリー", "きのこ", "えのき", "海藻", "わかめ"]),
+    ("豚・牛・加工肉", ["豚", "牛", "ベーコン", "ウインナー", "ソーセージ", "ハム", "生姜焼き"]),
+    ("麺類", ["麺", "ラーメン", "そば", "うどん", "パスタ", "中華そば"]),
+    ("スープ・汁物・鍋", ["スープ", "汁", "鍋", "ミネストローネ"]),
+    ("ご飯・パン・穀物", ["ご飯", "おにぎり", "パン", "もち麦", "オートミール", "米"]),
+    ("魚介", ["鮭", "魚", "ツナ", "イカ", "刺身", "したらば", "明太", "サバ", "えび"]),
+    ("大豆製品", ["納豆", "豆腐", "大豆", "枝豆"]),
+    ("卵", ["卵", "たまご"]),
+    ("菓子・甘いもの", ["チョコ", "菓子", "ポテトチップス", "アイス", "ケーキ"]),
+]
+
+
+AGGREGATE_GROUP = "まとめて記録（内訳なし）"
+
+
+def is_aggregate(name: str) -> bool:
+    """「朝食（チャットで集計）」のように、1食分をまとめて記録した品目か。"""
+    import re
+    return bool(re.match(r"^(朝食|昼食|夕食|朝兼昼食|間食)（", name))
+
+
+def food_group(name: str) -> str:
+    if is_aggregate(name):
+        return AGGREGATE_GROUP
+    for g, words in FOOD_GROUPS:
+        if any(w in name for w in words):
+            return g
+    return "その他"
+
+
 # 判定レベル（レポートでアイコン＋ラベルを付ける）
 GOOD, INFO, WARN, ALERT = "good", "info", "warn", "alert"
 
@@ -120,25 +154,45 @@ def analyze_week(end: date | None = None, con=None):
         summary["projected_kg_month"] = summary["avg_net"] * 30 / config.KCAL_PER_KG_FAT
 
     # ---- 食べたもの・飲んだもの ----
-    food_counter, drink_counter = Counter(), Counter()
-    kcal_by_name = defaultdict(float)
+    groups = defaultdict(lambda: {"count": 0, "kcal": 0.0, "protein": 0.0, "salt": 0.0})
+    drinks = defaultdict(lambda: {"count": 0, "kcal": 0.0, "alcohol": 0.0})
+    all_items = []
     upf_kcal = drink_kcal = total_kcal = 0.0
     for x in daily:
         for it in x["items"]:
             name = it.get("name", "不明")
-            (drink_counter if it.get("kind") == "drink" else food_counter)[name] += 1
-            kcal_by_name[name] += float(it.get("kcal") or 0)
-            total_kcal += float(it.get("kcal") or 0)
+            k = float(it.get("kcal") or 0)
+            total_kcal += k
             if it.get("ultra_processed"):
-                upf_kcal += float(it.get("kcal") or 0)
+                upf_kcal += k
             if it.get("kind") == "drink":
-                drink_kcal += float(it.get("kcal") or 0)
+                drink_kcal += k
+                d = drinks[name]
+                d["count"] += 1
+                d["kcal"] += k
+                d["alcohol"] += float(it.get("alcohol_g") or 0)
+                continue
+            g = groups[food_group(name)]
+            g["count"] += 1
+            g["kcal"] += k
+            g["protein"] += float(it.get("protein_g") or 0)
+            g["salt"] += float(it.get("salt_g") or 0)
+            if is_aggregate(name):
+                continue
+            all_items.append({"name": name, "date": x["date"], "weekday": x["weekday"], "kcal": round(k),
+                              "protein": round(float(it.get("protein_g") or 0), 1)})
     summary["upf_share"] = upf_kcal / total_kcal if total_kcal else 0
     summary["drink_share"] = drink_kcal / total_kcal if total_kcal else 0
 
+    food_kcal = sum(v["kcal"] for v in groups.values()) or 1
     frequent = {
-        "foods": [{"name": n, "count": c, "kcal": round(kcal_by_name[n])} for n, c in food_counter.most_common(8)],
-        "drinks": [{"name": n, "count": c, "kcal": round(kcal_by_name[n])} for n, c in drink_counter.most_common(6)],
+        "groups": sorted(({"name": g, "count": v["count"], "kcal": round(v["kcal"]), "protein": round(v["protein"]),
+                           "salt": round(v["salt"], 1), "share": v["kcal"] / food_kcal} for g, v in groups.items()),
+                         key=lambda r: -r["kcal"]),
+        "top_kcal": sorted(all_items, key=lambda r: -r["kcal"])[:5],
+        "top_protein": sorted(all_items, key=lambda r: -r["protein"])[:5],
+        "drinks": sorted(({"name": n, "count": v["count"], "kcal": round(v["kcal"]), "alcohol": round(v["alcohol"], 1)}
+                          for n, v in drinks.items()), key=lambda r: -r["count"]),
     }
 
     # ---- 運動集計 ----

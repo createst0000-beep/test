@@ -160,6 +160,37 @@ def hbar_list(rows, value_key, unit, color="var(--s1)", label_key="name", tip_fn
     return "".join(out)
 
 
+def frequent_html(fr):
+    """食品グループ別の内訳、カロリー・たんぱく質の多い品目、飲み物。"""
+    if not fr["groups"] and not fr["drinks"]:
+        return '<p class="muted">データがありません</p>'
+    out = ['<h3>食品グループ別（カロリーの多い順）</h3><p class="muted" style="font-size:.8rem;margin:-4px 0 8px">「まとめて記録」は、品目の内訳がなく1食分の合計だけを記録した食事です。</p><div class="grows">']
+    for g in fr["groups"]:
+        out.append(f'<div class="grow hit" data-tip="{E(g["name"])}|{g["count"]} 品|{g["kcal"]:,} kcal（{g["share"]*100:.0f}%）|たんぱく質 {g["protein"]} g・塩分 {g["salt"]} g">'
+                   f'<span class="gname">{E(g["name"])}</span>'
+                   f'<span class="gbar"><span style="width:{g["share"]*100:.1f}%"></span></span>'
+                   f'<span class="gval">{g["count"]}品・{g["kcal"]:,} kcal・P {g["protein"]} g</span></div>')
+    out.append('</div>')
+
+    def lst(rows, key, unit):
+        if not rows:
+            return '<p class="muted">データがありません</p>'
+        return '<ol class="rank">' + "".join(
+            f'<li><span class="rwrap"><span class="rname">{E(r["name"])}<span class="muted"> {r["date"][5:]}（{r["weekday"]}）</span></span>'
+            f'<span class="rval">{r[key]:,}{unit}</span></span></li>' for r in rows) + '</ol>'
+
+    out.append('<div class="two"><div><h3>カロリーが多かった品目</h3>' + lst(fr["top_kcal"], "kcal", " kcal") +
+               '</div><div><h3>たんぱく質が多かった品目</h3>' + lst(fr["top_protein"], "protein", " g") + '</div></div>')
+    if fr["drinks"]:
+        out.append('<h3>飲み物</h3><ol class="rank">' + "".join(
+            f'<li><span class="rwrap"><span class="rname">{E(d["name"])}</span><span class="rval">{d["count"]}回・{d["kcal"]:,} kcal'
+            + (f'・アルコール {d["alcohol"]} g' if d["alcohol"] else "") + '</span></span></li>'
+            for d in fr["drinks"]) + '</ol>')
+    else:
+        out.append('<h3>飲み物</h3><p class="muted">カロリーのある飲み物の記録はありません（水・お茶・ブラックコーヒーは記録しなくて大丈夫です）。</p>')
+    return "".join(out)
+
+
 MUSCLE_ORDER = ["chest", "back", "legs", "shoulders", "arms", "glutes", "core"]
 
 
@@ -291,8 +322,7 @@ def render(data):
         chart_p=chart_protein(daily, bw),
         table_rows=table_rows,
         day_items="".join(day_items),
-        foods=hbar_list(fr["foods"], "count", " 回", "var(--s1)", tip_fn=lambda r: f"{r['name']}|{r['count']} 回|計 {r['kcal']:,} kcal"),
-        drinks=hbar_list(fr["drinks"], "count", " 回", "var(--s2)", tip_fn=lambda r: f"{r['name']}|{r['count']} 回|計 {r['kcal']:,} kcal"),
+        frequent=frequent_html(fr),
         food_notes=notes_html(data["food_notes"]),
         exercise=exercise_html(daily, ex),
         ex_notes=notes_html(data["exercise_notes"]),
@@ -355,6 +385,13 @@ details.day{{border-bottom:1px solid var(--line);padding:8px 0}} details.day sum
 .exdetail{{font-size:.86rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}}
 .exkcal{{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink2);font-size:.85rem}}
 .chip{{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin:2px 2px 0 0;font-size:.72rem;color:var(--ink2)}}
+.grows{{display:flex;flex-direction:column;gap:6px}}
+.grow{{display:grid;grid-template-columns:minmax(7em,30%) 1fr auto;gap:10px;align-items:center;font-size:.88rem}}
+.gname{{font-weight:600}} .gbar{{height:12px;background:var(--grid);border-radius:0 4px 4px 0}} .gbar span{{display:block;height:12px;background:var(--s1);border-radius:0 4px 4px 0;min-width:2px}}
+.gval{{color:var(--ink2);font-size:.8rem;font-variant-numeric:tabular-nums;white-space:nowrap}}
+@media (max-width:640px){{.grow{{grid-template-columns:1fr auto}} .gbar{{grid-column:1/-1;order:3}}}}
+ol.rank{{margin:0;padding-left:1.4em;font-size:.88rem}} ol.rank li{{padding:4px 0;border-bottom:1px solid var(--line)}}
+.rank li>span.rwrap{{display:flex;justify-content:space-between;gap:10px}} .rname{{overflow-wrap:anywhere;min-width:0}} .rval{{color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}}
 #tip{{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;z-index:9;white-space:nowrap}}
 #tip b{{display:block}} .hit:hover path,.hit:hover .hb{{opacity:.8}}
 </style></head><body><main>
@@ -369,7 +406,7 @@ details.day{{border-bottom:1px solid var(--line);padding:8px 0}} details.day sum
 <section><h2>たんぱく質（筋肉維持チェック）</h2>{chart_p}</section>
 
 <section><h2>食べたもの・飲んだもの</h2>{day_items}</section>
-<section><h2>よく食べているもの・飲んでいるもの</h2><div class="two"><div><h3>食べ物（回数）</h3>{foods}</div><div><h3>飲み物（回数）</h3>{drinks}</div></div></section>
+<section><h2>よく食べているもの・飲んでいるもの</h2>{frequent}</section>
 <section><h2>食事・飲み物についての注意点</h2>{food_notes}</section>
 
 <section><h2>運動内容</h2>{exercise}</section>
