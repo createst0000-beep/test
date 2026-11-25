@@ -1,6 +1,23 @@
 """判定ルールの根拠となる文献。レポートの注意点にはここの ID を付けて出典を明示する。"""
 
 SOURCES = {
+    # ---- 特に重視する情報源（利用者の希望）: バズーカ岡田（岡田隆・日本体育大学教授） ----
+    # 具体的な主張を判定に使うときは、確認した動画 URL や書名・該当箇所を別エントリとして追加する。
+    "okada_youtube": {
+        "cite": "岡田隆（バズーカ岡田）公式 YouTube「新・バズーカ岡田チャンネル」",
+        "url": "https://www.youtube.com/@bazooka_okada",
+        "point": "除脂肪（減量）と筋肉維持の実践的な方法についての公式発信。特に重要な参考文献として扱う。",
+    },
+    "okada_book_jyoshibou": {
+        "cite": "岡田隆『除脂肪メソッド』",
+        "url": "",
+        "point": "筋肉を残して体脂肪を落とすための食事とトレーニングの方法をまとめた代表作。",
+    },
+    "okada_book_muteki": {
+        "cite": "岡田隆『無敵の筋トレ食』ポプラ社, 2022",
+        "url": "https://www.maruzenjunkudo.co.jp/products/9784591172483",
+        "point": "筋トレをする人の食事の選び方。",
+    },
     "hall2008": {
         "cite": "Hall KD. What is the required energy deficit per unit weight loss? Int J Obes. 2008;32:573-576.",
         "url": "https://doi.org/10.1038/sj.ijo.0803720",

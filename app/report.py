@@ -180,7 +180,7 @@ def render(data):
         out = []
         for n in notes:
             icon, lab = LEVEL[n["level"]]
-            srcs = "".join(f'<li><a href="{E(c["url"])}" target="_blank" rel="noopener">{E(c["cite"])}</a><br><span class="muted">{E(c["point"])}</span></li>'
+            srcs = "".join(f'<li>{(f"<a href=\"{E(c["url"])}\" target=\"_blank\" rel=\"noopener\">{E(c["cite"])}</a>" if c["url"] else E(c["cite"]))}<br><span class="muted">{E(c["point"])}</span></li>'
                            for c in cite_list(n["sources"]))
             out.append(f'<article class="note {n["level"]}"><header><span class="badge"><b>{icon}</b>{lab}</span>'
                        f'<h4>{E(n["title"])}</h4></header><p>{E(n["body"])}</p>'
